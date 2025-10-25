@@ -20,4 +20,17 @@ def new_research_paper(payload: dict) -> ResearchPaper:
         title=payload.get("title", ""),
         authors=payload.get("authors", []),
         abstract=payload.get("abstract", ""),
+        pdf_url=extract_pdf_url(payload)
     )
+
+def extract_pdf_url(payload: dict) -> str:
+    pdf_url = None
+    external_ids = payload.get("externalIds") or {}
+
+    if "ArXiv" in external_ids:
+        arxiv_id = external_ids["ArXiv"]
+        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+    elif payload.get("isOpenAccess") and payload.get("openAccessPdf", {}).get("url"):
+        pdf_url = payload["openAccessPdf"]["url"]
+
+    return pdf_url

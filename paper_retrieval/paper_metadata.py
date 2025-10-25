@@ -8,19 +8,6 @@ API_URL = "https://api.semanticscholar.org/graph/v1"
 DEFAULT_FIELDS = "title,isOpenAccess,openAccessPdf,externalIds,url,authors,abstract"
 
 
-def extract_pdf_url(paper: dict) -> str:
-    pdf_url = None
-    external_ids = paper.get("externalIds") or {}
-
-    if "ArXiv" in external_ids:
-        arxiv_id = external_ids["ArXiv"]
-        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-    elif paper.get("isOpenAccess") and paper.get("openAccessPdf", {}).get("url"):
-        pdf_url = paper["openAccessPdf"]["url"]
-
-    return pdf_url
-
-
 def search(query, limit=50) -> list[ResearchPaper]:
     params = {
         "query": query,
@@ -37,7 +24,6 @@ def search(query, limit=50) -> list[ResearchPaper]:
     filtered = []
     for paper in results:
         paper_obj = new_research_paper(paper)
-        paper_obj.pdf_url = extract_pdf_url(paper)
         if paper_obj.pdf_url:
             filtered.append(paper_obj)
 
@@ -71,8 +57,8 @@ def get_references(
             if not paper:
                 continue
             paper_obj = new_research_paper(paper)
-            paper_obj.pdf_url = extract_pdf_url(paper)
-            references.append(paper_obj)
+            if paper_obj.pdf_url:
+                references.append(paper_obj)
 
             if max_results is not None and len(references) >= max_results:
                 return references
