@@ -10,7 +10,7 @@ class ResearchPaper:
     authors: List[dict]
     abstract: str
     pdf_url: Optional[str] = None
-    citations: List["ResearchPaper"] = field(default_factory=list)
+    references: List["ResearchPaper"] = field(default_factory=list)
 
 
 def new_research_paper(payload: dict) -> ResearchPaper:
