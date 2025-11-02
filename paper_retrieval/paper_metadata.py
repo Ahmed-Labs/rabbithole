@@ -5,7 +5,7 @@ from paper_retrieval.session import session as r
 from paper_retrieval.research_paper import ResearchPaper, new_research_paper
 
 API_URL = "https://api.semanticscholar.org/graph/v1"
-DEFAULT_FIELDS = "title,isOpenAccess,openAccessPdf,externalIds,url,authors,abstract"
+DEFAULT_FIELDS = "title,isOpenAccess,openAccessPdf,externalIds,url,authors,abstract,year,citationCount"
 
 
 def search(query, limit=50) -> list[ResearchPaper]:
