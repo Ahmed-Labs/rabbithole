@@ -1,9 +1,9 @@
-# SPECTER2 Quick Reference
+# Semantic Similarity Quick Reference
 
 ## Installation (One Command)
 
 ```bash
-pip install transformers adapters torch scikit-learn numpy
+pip install -r requirements.txt
 ```
 
 ## Test It Works
