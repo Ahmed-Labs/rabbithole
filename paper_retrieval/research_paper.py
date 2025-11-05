@@ -11,6 +11,8 @@ class ResearchPaper:
     abstract: str
     pdf_url: Optional[str] = None
     references: List["ResearchPaper"] = field(default_factory=list)
+    year: Optional[int] = None
+    citation_count: Optional[int] = None
 
 
 def new_research_paper(payload: dict) -> ResearchPaper:
@@ -20,7 +22,9 @@ def new_research_paper(payload: dict) -> ResearchPaper:
         title=payload.get("title", ""),
         authors=payload.get("authors", []),
         abstract=payload.get("abstract", ""),
-        pdf_url=extract_pdf_url(payload)
+        pdf_url=extract_pdf_url(payload),
+        year=payload.get("year"),
+        citation_count=payload.get("citationCount")
     )
 
 def extract_pdf_url(payload: dict) -> str:
