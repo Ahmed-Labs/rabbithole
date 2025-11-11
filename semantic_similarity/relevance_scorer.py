@@ -243,68 +243,116 @@ class RelevanceScorer:
             'combined_score': combined
         }
     
-    def score_references_recursive(
-        self, 
-        root_paper, 
-        depth: int = 0,
-        max_depth: int = 2,
+    def score_all_papers(
+        self,
+        root_paper,
+        max_ref_depth: int = 2,
+        max_cit_depth: int = 1,
         path_prob: float = 1.0
     ) -> List[Dict]:
         """
-        Recursively score all papers in reference tree against root paper.
+        Score all papers in the graph (both references and citations).
+        
+        Args:
+            root_paper: Root paper with references and citations populated
+            max_ref_depth: Maximum depth for references
+            max_cit_depth: Maximum depth for citations
+            path_prob: Starting path probability
+            
+        Returns:
+            List of scored papers with metadata
         """
         results = []
+        seen_papers = {root_paper.id}  # Track to avoid duplicates
         
-        if depth >= max_depth or not root_paper.references:
-            return results
+        # Score references recursively (papers this paper cites)
+        def score_references(paper, depth, prob, edge_type="reference"):
+            if depth >= max_ref_depth or not paper.references:
+                return
+            
+            for ref in paper.references:
+                if ref.id in seen_papers:
+                    continue
+                seen_papers.add(ref.id)
+                
+                scores = self.score_paper_relevance(root_paper, ref)
+                
+                # Path probability decay
+                edge_prob = 0.8 if depth == 0 else 0.6
+                current_prob = prob * edge_prob
+                
+                final_relevance = scores['combined_score'] * current_prob
+                
+                results.append({
+                    "paper_id": ref.id,
+                    "title": ref.title,
+                    "depth": depth + 1,
+                    "edge_type": "reference",  # This paper cites ref
+                    "semantic_similarity": scores['semantic_similarity'],
+                    "bibliographic_coupling": scores['bibliographic_coupling'],
+                    "year_similarity": scores['year_similarity'],
+                    "citation_score": scores['citation_score'],
+                    "combined_score": scores['combined_score'],
+                    "path_probability": current_prob,
+                    "relevance_score": final_relevance
+                })
+                
+                score_references(ref, depth + 1, current_prob, edge_type)
         
-        for ref in root_paper.references:
-            # Compute all relevance components
-            scores = self.score_paper_relevance(root_paper, ref)
+        # Score citations recursively (papers that cite this paper)
+        def score_citations(paper, depth, prob, edge_type="citation"):
+            if depth >= max_cit_depth or not paper.citations:
+                return
             
-            # Path probability decay
-            edge_prob = 0.8 if depth == 0 else 0.6
-            current_path_prob = path_prob * edge_prob
-            
-            # Final relevance combines semantic score with path probability
-            final_relevance = scores['combined_score'] * current_path_prob
-            
-            results.append({
-                "paper_id": ref.id,
-                "title": ref.title,
-                "depth": depth + 1,
-                "semantic_similarity": scores['semantic_similarity'],
-                "bibliographic_coupling": scores.get('bibliographic_coupling', 0.0),
-                "year_similarity": scores.get('year_similarity', 0.5),
-                "citation_score": scores.get('citation_score', 0.5),
-                "combined_score": scores['combined_score'],
-                "path_probability": current_path_prob,
-                "relevance_score": final_relevance
-            })
-            
-            # Recurse into references
-            sub_results = self.score_references_recursive(
-                ref, 
-                depth=depth + 1, 
-                max_depth=max_depth,
-                path_prob=current_path_prob
-            )
-            results.extend(sub_results)
+            for cit in paper.citations:
+                if cit.id in seen_papers:
+                    continue
+                seen_papers.add(cit.id)
+                
+                scores = self.score_paper_relevance(root_paper, cit)
+                
+                # Path probability decay (same as references)
+                edge_prob = 0.8 if depth == 0 else 0.6
+                current_prob = prob * edge_prob
+                
+                final_relevance = scores['combined_score'] * current_prob
+                
+                results.append({
+                    "paper_id": cit.id,
+                    "title": cit.title,
+                    "depth": depth + 1,
+                    "edge_type": "citation",  # cit cites this paper
+                    "semantic_similarity": scores['semantic_similarity'],
+                    "bibliographic_coupling": scores['bibliographic_coupling'],
+                    "year_similarity": scores['year_similarity'],
+                    "citation_score": scores['citation_score'],
+                    "combined_score": scores['combined_score'],
+                    "path_probability": current_prob,
+                    "relevance_score": final_relevance
+                })
+                
+                score_citations(cit, depth + 1, current_prob, edge_type)
+        
+        # Score both directions
+        score_references(root_paper, 0, path_prob)
+        score_citations(root_paper, 0, path_prob)
         
         return results
 
 
 def compute_relevance_scores(
     root_paper, 
-    max_depth: int = 2,
+    max_ref_depth: int = 2,
+    max_cit_depth: int = 1,
     use_cache: bool = True
 ) -> Tuple[List[Dict], RelevanceScorer]:
     """
-    Convenience function to compute relevance scores for a paper tree.
+    Convenience function to compute relevance scores for entire paper graph.
     
     Args:
-        root_paper: Root paper with references loaded
-        max_depth: Maximum depth to traverse
+        root_paper: Root paper with references and citations loaded
+        max_ref_depth: Maximum depth to traverse for references
+        max_cit_depth: Maximum depth to traverse for citations
         use_cache: Whether to cache embeddings
         
     Returns:
@@ -313,10 +361,10 @@ def compute_relevance_scores(
     scorer = RelevanceScorer(use_cache=use_cache)
     
     print("\nComputing relevance scores...")
-    results = scorer.score_references_recursive(
-        root_paper, 
-        depth=0, 
-        max_depth=max_depth
+    results = scorer.score_all_papers(
+        root_paper,
+        max_ref_depth=max_ref_depth,
+        max_cit_depth=max_cit_depth
     )
     
     # Sort by final relevance score
