@@ -246,8 +246,7 @@ class RelevanceScorer:
     def score_all_papers(
         self,
         root_paper,
-        max_ref_depth: int = 2,
-        max_cit_depth: int = 1,
+        max_depth: int = 2,
         path_prob: float = 1.0
     ) -> List[Dict]:
         """
@@ -255,8 +254,7 @@ class RelevanceScorer:
         
         Args:
             root_paper: Root paper with references and citations populated
-            max_ref_depth: Maximum depth for references
-            max_cit_depth: Maximum depth for citations
+            max_depth: Maximum depth for both references and citations
             path_prob: Starting path probability
             
         Returns:
@@ -267,7 +265,7 @@ class RelevanceScorer:
         
         # Score references recursively (papers this paper cites)
         def score_references(paper, depth, prob, edge_type="reference"):
-            if depth >= max_ref_depth or not paper.references:
+            if depth >= max_depth or not paper.references:
                 return
             
             for ref in paper.references:
@@ -301,7 +299,7 @@ class RelevanceScorer:
         
         # Score citations recursively (papers that cite this paper)
         def score_citations(paper, depth, prob, edge_type="citation"):
-            if depth >= max_cit_depth or not paper.citations:
+            if depth >= max_depth or not paper.citations:
                 return
             
             for cit in paper.citations:
@@ -342,8 +340,7 @@ class RelevanceScorer:
 
 def compute_relevance_scores(
     root_paper, 
-    max_ref_depth: int = 2,
-    max_cit_depth: int = 1,
+    max_depth: int = 2,
     use_cache: bool = True
 ) -> Tuple[List[Dict], RelevanceScorer]:
     """
@@ -351,8 +348,7 @@ def compute_relevance_scores(
     
     Args:
         root_paper: Root paper with references and citations loaded
-        max_ref_depth: Maximum depth to traverse for references
-        max_cit_depth: Maximum depth to traverse for citations
+        max_depth: Maximum depth to traverse (applies to both references and citations)
         use_cache: Whether to cache embeddings
         
     Returns:
@@ -363,8 +359,7 @@ def compute_relevance_scores(
     print("\nComputing relevance scores...")
     results = scorer.score_all_papers(
         root_paper,
-        max_ref_depth=max_ref_depth,
-        max_cit_depth=max_cit_depth
+        max_depth=max_depth
     )
     
     # Sort by final relevance score

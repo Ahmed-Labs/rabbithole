@@ -142,29 +142,28 @@ def get_citations_recur(
 
 def build_full_graph(
     root_paper: ResearchPaper,
-    ref_depth: int = 1,
-    cit_depth: int = 1,
-    max_references: int = 10,
-    max_citations: int = 10
+    depth: int = 1,
+    max_per_level: int = 10,
+    include_citations: bool = True
 ) -> ResearchPaper:
     """
     Build a complete graph with both references and citations.
     
     Args:
         root_paper: The root paper to expand from
-        ref_depth: How many levels of references to fetch
-        cit_depth: How many levels of citations to fetch
-        max_references: Max references per paper per level
-        max_citations: Max citations per paper per level
+        depth: How many levels to fetch (applies to both references and citations)
+        max_per_level: Max papers per level (applies to both references and citations)
+        include_citations: Whether to fetch citations in addition to references
         
     Returns:
         Root paper with both references and citations populated
     """
-    print(f"Fetching references (depth={ref_depth}, max={max_references})...")
-    get_references_recur(root_paper, depth=ref_depth, max_references=max_references)
+    print(f"Fetching references (depth={depth}, max={max_per_level})...")
+    get_references_recur(root_paper, depth=depth, max_references=max_per_level)
     
-    print(f"Fetching citations (depth={cit_depth}, max={max_citations})...")
-    get_citations_recur(root_paper, depth=cit_depth, max_citations=max_citations)
+    if include_citations:
+        print(f"Fetching citations (depth={depth}, max={max_per_level})...")
+        get_citations_recur(root_paper, depth=depth, max_citations=max_per_level)
     
     return root_paper
 

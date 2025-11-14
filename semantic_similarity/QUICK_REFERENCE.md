@@ -69,13 +69,10 @@ Edit `visualize_with_relevance.py`:
 ```python
 query = "your search here"  # Line ~122
 
-# Reference configuration (papers this cites)
-ref_depth = 2               # How many citation levels (1-3)
-max_references = 10         # Papers per level (5-20)
-
-# Citation configuration (papers that cite this)
-cit_depth = 1              # Usually keep at 1 (citations grow fast!)
-max_citations = 5          # Keep low (5-10) to avoid explosion
+# Configuration (applies to both references and citations)
+depth = 2              # How many levels to traverse (1-3)
+max_per_level = 10     # Papers per level (5-20)
+include_citations = True  # Set False to only get references
 ```
 
 ## Tuning Weights
@@ -117,20 +114,17 @@ print(f"Using: {'GPU' if torch.cuda.is_available() else 'CPU'}")
 
 ### Get More Papers
 ```python
-max_references = 20  # Default: 10
-max_citations = 10   # Default: 5 (be careful, grows fast!)
+max_per_level = 20  # Default: 10
 ```
 
-### Go Deeper (References)
+### Go Deeper
 ```python
-ref_depth = 3  # Default: 2 (warning: exponential growth!)
+depth = 3  # Default: 2 (warning: exponential growth!)
 ```
 
-### Include More Citations
+### References Only (No Citations)
 ```python
-cit_depth = 2         # Default: 1
-max_citations = 10    # Default: 5
-# ⚠️ Warning: Citations explode quickly!
+include_citations = False  # Skip citation fetching
 ```
 
 ### Different Search

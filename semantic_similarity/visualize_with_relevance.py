@@ -209,22 +209,21 @@ if __name__ == "__main__":
     print(f"Citations: {root_paper.citation_count or 0}")
     print("="*100)
 
-    # Configuration for graph building
-    ref_depth = 2  # How many levels of references to fetch
-    cit_depth = 1  # How many levels of citations to fetch
-    max_references = 10  # Max references per paper per level
-    max_citations = 5   # Max citations per paper per level (usually want fewer)
+    # Configuration
+    depth = 2              # How many levels deep to traverse (both references and citations)
+    max_per_level = 10     # Max papers per level (both references and citations)
+    include_citations = True  # Whether to include citation edges
     
     print(f"\nBuilding paper graph:")
-    print(f"  References: depth={ref_depth}, max_per_level={max_references}")
-    print(f"  Citations: depth={cit_depth}, max_per_level={max_citations}")
+    print(f"  Depth: {depth} levels")
+    print(f"  Max per level: {max_per_level} papers")
+    print(f"  Include citations: {include_citations}")
     
     root_paper = build_full_graph(
         root_paper,
-        ref_depth=ref_depth,
-        cit_depth=cit_depth,
-        max_references=max_references,
-        max_citations=max_citations
+        depth=depth,
+        max_per_level=max_per_level,
+        include_citations=include_citations
     )
 
     print("\nComputing relevance scores with SPECTER2...")
@@ -232,8 +231,7 @@ if __name__ == "__main__":
     
     results, scorer = compute_relevance_scores(
         root_paper,
-        max_ref_depth=ref_depth,
-        max_cit_depth=cit_depth,
+        max_depth=depth,
         use_cache=True
     )
     
