@@ -11,6 +11,7 @@ class ResearchPaper:
     abstract: str
     pdf_url: Optional[str] = None
     references: List["ResearchPaper"] = field(default_factory=list)
+    citations: List["ResearchPaper"] = field(default_factory=list)  # Papers that cite this paper
     year: Optional[int] = None
     citation_count: Optional[int] = None
 
