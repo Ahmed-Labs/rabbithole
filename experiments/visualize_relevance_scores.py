@@ -1,11 +1,9 @@
 from pathlib import Path
 from pyvis.network import Network
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
 
 from paper_retrieval.paper_metadata import search, build_full_graph
 from paper_retrieval.research_paper import ResearchPaper
-from semantic_similarity import compute_relevance_scores
+from relevance_scoring import compute_relevance_scores
 
 
 def build_graph_with_scores(root: ResearchPaper, scores_map: dict):

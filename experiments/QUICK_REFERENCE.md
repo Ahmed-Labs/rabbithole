@@ -34,8 +34,7 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
       ├─ Semantic (SPECTER2): 0.8500
       ├─ Bib. Coupling: 0.1200
       ├─ Year Similarity: 0.9500
-      ├─ Citation Score: 0.7000
-      └─ Path Probability: 0.8000 (depth: 1)
+      └─ Citation Score: 0.7000
 ```
 
 ## Understanding the Scores
@@ -47,7 +46,6 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
 | **Bib. Coupling** | 0-1 | Ratio of shared references (ConnectedPapers method) |
 | **Year Similarity** | 0-1 | How close in publication year (1.0 = same year) |
 | **Citation Score** | 0-1 | Normalized citation count (more = better) |
-| **Path Probability** | 0-1 | Distance in citation chain (0.8 = direct, 0.48 = 2nd level) |
 
 ## Formula
 
@@ -58,8 +56,6 @@ combined_score = (
     0.10 * year_similarity +
     0.05 * citation_score
 )
-
-relevance_score = combined_score * path_probability
 ```
 
 ## Customize Query

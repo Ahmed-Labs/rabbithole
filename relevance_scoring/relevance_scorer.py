@@ -1,0 +1,169 @@
+from typing import List, Tuple, Optional
+from dataclasses import dataclass
+import numpy as np
+
+from relevance_scoring.embedder import Embedder
+from paper_retrieval import ResearchPaper
+
+
+@dataclass
+class RelevanceScore:
+    semantic_similarity: float
+    bibliographic_coupling: float
+    year_similarity: float
+    citation_score: float
+
+    @property
+    def combined(self):
+        return (
+            0.70 * self.semantic_similarity
+            + 0.15 * self.bibliographic_coupling
+            + 0.10 * self.year_similarity
+            + 0.05 * self.citation_score
+        )
+
+
+@dataclass
+class RelevanceEdge:
+    src_id: str
+    dest_id: str
+    relevance_score: RelevanceScore
+
+
+class RelevanceScorer:
+    """
+    Compute semantic relevance scores between papers.
+
+    Relevance scores consist of:
+    - Semnatic similarity
+    - Co-citation analysis (papers cited together)
+    - Bibliographic coupling (papers sharing references)
+    - Publication year proximity
+    """
+
+    def __init__(self):
+        self.embedder = Embedder()
+
+    def _get_paper_text(self, paper) -> str:
+        """
+        Extract text representation from a paper.
+        SPECTER2 is trained on title+abstract with SEP token between them.
+        """
+        title = paper.title or ""
+        abstract = paper.abstract or ""
+        # SPECTER2 uses SEP token between title and abstract
+        return f"{title} {abstract}".strip()
+
+    def _compute_year_similarity(
+        self, year1: Optional[int], year2: Optional[int]
+    ) -> float:
+        """
+        Compute year proximity score (ConnectedPapers prioritizes similar generations).
+        Returns 1.0 for same year, decaying with distance.
+        """
+        if year1 is None or year2 is None:
+            return 0.5  # neutral if year unknown
+
+        year_diff = abs(year1 - year2)
+
+        # Decay function: 1.0 at 0 years, 0.5 at 5 years, ~0.2 at 10 years
+        return np.exp(-year_diff / 5.0)
+
+    def _compute_bibliographic_coupling(self, paper1, paper2) -> float:
+        """
+        Compute bibliographic coupling: how many references they share.
+        This is what ConnectedPapers uses alongside co-citation.
+        """
+        if not paper1.references or not paper2.references:
+            return 0.0
+
+        refs1 = {ref.id for ref in paper1.references}
+        refs2 = {ref.id for ref in paper2.references}
+
+        shared = len(refs1 & refs2)
+        total = len(refs1 | refs2)
+
+        return shared / total if total > 0 else 0.0
+
+    def _get_citation_score(self, paper) -> float:
+        """
+        Normalize citation count to 0-1 range.
+        More citations = potentially more important paper.
+        """
+        if not hasattr(paper, "citation_count") or paper.citation_count is None:
+            return 0.5
+
+        # Log scale normalization (most papers have 0-1000 citations)
+        # Score: 0.5 at 100 citations, ~0.7 at 1000 citations
+        return min(0.5 + np.log10(paper.citation_count + 1) / 6, 1.0)
+
+    def compute_score(
+        self, root_paper: ResearchPaper, target_paper: ResearchPaper
+    ) -> RelevanceScore:
+        # Compute semantic similarity
+        root_text = self._get_paper_text(root_paper)
+        target_text = self._get_paper_text(target_paper)
+
+        root_emb = self.embedder.embed(root_text, root_paper.id)
+        target_emb = self.embedder.embed(target_text, target_paper.id)
+
+        semantic_sim = self.embedder.compute_similarity(root_emb, target_emb)
+
+        # Compute other relevance factors
+        bib_coupling = self._compute_bibliographic_coupling(root_paper, target_paper)
+        year_sim = self._compute_year_similarity(root_paper.year, target_paper.year)
+
+        citation_score = self._get_citation_score(target_paper)
+
+        return RelevanceScore(
+            semantic_similarity=semantic_sim,
+            bibliographic_coupling=bib_coupling,
+            year_similarity=year_sim,
+            citation_score=citation_score,
+        )
+
+    def compute_relevance_edges(
+        self,
+        root_paper: ResearchPaper,
+    ) -> List[RelevanceEdge]:
+        """
+        Recursively score all papers in reference tree against root paper.
+        """
+        edges = []
+        computed_edges = set()
+
+        def recur(curr_paper: ResearchPaper):
+            adjacent_papers = curr_paper.references + curr_paper.citations
+            if not adjacent_papers:
+                return []
+
+            for adj in adjacent_papers:
+                if (root_paper.id, adj.id) in computed_edges:
+                    continue
+                
+                score = self.compute_score(root_paper, adj)
+
+                edges.append(
+                    RelevanceEdge(
+                        src_id=root_paper.id,
+                        dest_id=adj.id,
+                        relevance_score=score,
+                    )
+                )
+                computed_edges.add((root_paper.id, adj.id))
+                computed_edges.add((adj.id, root_paper.id))
+                recur(adj)
+
+        recur(root_paper)
+        return edges
+
+
+def compute_relevance_scores(root_paper) -> Tuple[List[RelevanceEdge]]:
+    scorer = RelevanceScorer()
+
+    print("\nComputing relevance scores...")
+    edges = scorer.compute_relevance_edges(root_paper)
+
+    edges.sort(key=lambda x: x.relevance_score.combined, reverse=True)
+
+    return edges
