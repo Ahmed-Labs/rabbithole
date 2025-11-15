@@ -1,7 +1,7 @@
 from pathlib import Path
 from pyvis.network import Network
-from paper_metadata import search, get_references_recur
-from research_paper import ResearchPaper
+from paper_retrieval.paper_metadata import search, get_references_recur
+from paper_retrieval.research_paper import ResearchPaper
 
 
 def build_graph(root: ResearchPaper):
