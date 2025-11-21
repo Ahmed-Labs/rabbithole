@@ -1,12 +1,39 @@
 from pathlib import Path
+from typing import Dict, List
+
 from pyvis.network import Network
 
 from paper_retrieval.paper_metadata import search, build_full_graph
 from paper_retrieval.research_paper import ResearchPaper
-from relevance_scoring import compute_relevance_scores
+from relevance_scoring.relevance_scorer import (
+    compute_relevance_scores,
+    RelevanceEdge,
+    RelevanceScore,
+)
 
 
-def build_graph_with_scores(root: ResearchPaper, scores_map: dict):
+def index_papers(root: ResearchPaper) -> Dict[str, ResearchPaper]:
+    """Build a mapping from paper id → ResearchPaper by traversing the graph."""
+    index: Dict[str, ResearchPaper] = {}
+    visited: set[str] = set()
+
+    def dfs(paper: ResearchPaper):
+        if paper.id in visited:
+            return
+        visited.add(paper.id)
+        index[paper.id] = paper
+        for ref in paper.references:
+            dfs(ref)
+        for cit in paper.citations:
+            dfs(cit)
+
+    dfs(root)
+    return index
+
+
+def build_graph_with_scores(
+    root: ResearchPaper, scores_map: Dict[str, RelevanceScore]
+) -> Network:
     """Build network graph with relevance scores and visual distinction for citations."""
     net = Network(
         directed=True,
@@ -28,243 +55,284 @@ def build_graph_with_scores(root: ResearchPaper, scores_map: dict):
         else:
             return "#ef4444"  # Red
 
-    seen_nodes = set()
-    
-    def add_paper(paper: ResearchPaper, depth: int = 0, is_citation: bool = False):
+    seen_nodes: set[str] = set()
+    added_edges: set[tuple[str, str, str]] = set()
+
+    def add_paper(paper: ResearchPaper, depth: int = 0):
         if paper.id in seen_nodes:
             return
         seen_nodes.add(paper.id)
-        
+
         # Root node is blue
         if depth == 0:
             color = "#3b82f6"
-            score_info = f"ROOT | Year: {paper.year or 'N/A'} | Citations: {paper.citation_count or 0}"
-        else:
-            score_data = scores_map.get(paper.id, {})
-            relevance = score_data.get("relevance_score", 0)
-            semantic = score_data.get("semantic_similarity", 0)
-            bib_coupling = score_data.get("bibliographic_coupling", 0)
-            year_sim = score_data.get("year_similarity", 0)
-            path_prob = score_data.get("path_probability", 0)
-            edge_type = score_data.get("edge_type", "reference")
-            
-            color = get_color_by_score(relevance)
-            edge_icon = "↓" if edge_type == "reference" else "↑"
             score_info = (
-                f"{edge_icon} {edge_type.upper()}\n"
-                f"Relevance: {relevance:.3f}\n"
-                f"Semantic: {semantic:.3f} | BibCoupling: {bib_coupling:.3f}\n"
-                f"YearSim: {year_sim:.3f} | Path: {path_prob:.3f}\n"
-                f"Year: {paper.year or 'N/A'} | Citations: {paper.citation_count or 0}"
+                f"ROOT\n"
+                f"Year: {paper.year or 'N/A'} | "
+                f"Citations: {paper.citation_count or 0}"
             )
-        
+        else:
+            score = scores_map.get(paper.id)
+            if score is None:
+                relevance = 0.0
+                semantic = 0.0
+                bib_coupling = 0.0
+                year_sim = 0.0
+                citation_score = 0.0
+            else:
+                relevance = score.combined
+                semantic = score.semantic_similarity
+                bib_coupling = score.bibliographic_coupling
+                year_sim = score.year_similarity
+                citation_score = score.citation_score
+
+            color = get_color_by_score(relevance)
+            score_info = (
+                f"Relevance: {relevance:.3f}\n"
+                f"Semantic: {semantic:.3f} | "
+                f"BibCoupling: {bib_coupling:.3f}\n"
+                f"YearSim: {year_sim:.3f} | "
+                f"CitationScore: {citation_score:.3f}\n"
+                f"Year: {paper.year or 'N/A'} | "
+                f"Citations: {paper.citation_count or 0}"
+            )
+
         # Add node with score information
-        node_label = (
-            f"{paper.title[:30]}\n"
-            f"Rel: {scores_map.get(paper.id, {}).get('relevance_score', 0):.3f}"
-            if depth > 0 else paper.title[:30]
-        )
+        if depth == 0:
+            node_label = paper.title[:30]
+        else:
+            relevance_for_label = (
+                scores_map.get(paper.id).combined if paper.id in scores_map else 0.0
+            )
+            node_label = (
+                f"{paper.title[:30]}\n"
+                f"Rel: {relevance_for_label:.3f}"
+            )
+
         node_title = f"{paper.title}\n\n{score_info}"
-        
+
         net.add_node(
-            paper.id, 
+            paper.id,
             label=node_label,
             title=node_title,
-            color=color
+            color=color,
         )
-    
+
     def add_edges(paper: ResearchPaper, depth: int = 0):
         """Add edges for both references and citations."""
-        # Add reference edges (solid lines - this paper cites them)
+        # References: paper → ref
         for ref in paper.references:
             if ref.id not in seen_nodes:
-                add_paper(ref, depth + 1, is_citation=False)
-            
-            if ref.id in scores_map:
-                edge_prob = scores_map[ref.id].get("path_probability", 0)
-                edge_label = f"{edge_prob:.2f}"
-            else:
-                edge_label = ""
-            
-            # Solid line for references (paper → reference)
-            net.add_edge(
-                paper.id, 
-                ref.id, 
-                label=edge_label,
-                dashes=False,  # Solid line
-                color="#666666",
-                arrows="to"
-            )
-            
+                add_paper(ref, depth + 1)
+
+            key = (paper.id, ref.id, "reference")
+            if key not in added_edges:
+                net.add_edge(
+                    paper.id,
+                    ref.id,
+                    dashes=False,  # Solid line
+                    color="#666666",
+                    arrows="to",
+                )
+                added_edges.add(key)
+
             # Recursively add edges for referenced papers
             add_edges(ref, depth + 1)
-        
-        # Add citation edges (dashed lines - these papers cite this one)
+
+        # Citations: cit → paper
         for cit in paper.citations:
             if cit.id not in seen_nodes:
-                add_paper(cit, depth + 1, is_citation=True)
-            
-            if cit.id in scores_map:
-                edge_prob = scores_map[cit.id].get("path_probability", 0)
-                edge_label = f"{edge_prob:.2f}"
-            else:
-                edge_label = ""
-            
-            # Dashed line for citations (citation → paper)
-            net.add_edge(
-                cit.id,
-                paper.id,
-                label=edge_label,
-                dashes=[5, 5],  # Dashed line pattern
-                color="#9333ea",  # Purple for citations
-                arrows="to"
-            )
-            
+                add_paper(cit, depth + 1)
+
+            key = (cit.id, paper.id, "citation")
+            if key not in added_edges:
+                net.add_edge(
+                    cit.id,
+                    paper.id,
+                    dashes=[5, 5],  # Dashed line pattern
+                    color="#9333ea",  # Purple for citations
+                    arrows="to",
+                )
+                added_edges.add(key)
+
             # Recursively add edges for citing papers
             add_edges(cit, depth + 1)
+
 
     # Start with root paper
     add_paper(root, 0)
     add_edges(root, 0)
-    
+
     return net
 
 
-def print_top_papers(results: list, top_n: int = 10):
-    """Print top N papers by relevance score, separated by type."""
-    print(f"\n{'='*100}")
-    print(f"TOP {top_n} MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)")
-    print(f"{'='*100}\n")
-    
-    # Separate by edge type
-    references = [r for r in results if r.get('edge_type') == 'reference']
-    citations = [r for r in results if r.get('edge_type') == 'citation']
-    
-    print(f"📚 REFERENCES (papers cited by root or its references):")
-    print(f"{'─'*100}")
-    for i, result in enumerate(references[:top_n], 1):
-        print(f"{i}. {result['title'][:70]}")
-        print(f"   └─ Relevance: {result['relevance_score']:.4f}")
-        print(f"      ├─ Semantic (SPECTER2): {result['semantic_similarity']:.4f}")
-        print(f"      ├─ Bib. Coupling: {result['bibliographic_coupling']:.4f}")
-        print(f"      ├─ Year Similarity: {result['year_similarity']:.4f}")
-        print(f"      ├─ Citation Score: {result['citation_score']:.4f}")
-        print(f"      └─ Path Probability: {result['path_probability']:.4f} (depth: {result['depth']})")
-        print()
-    
-    print(f"\n📖 CITATIONS (papers that cite root or papers citing root):")
-    print(f"{'─'*100}")
-    for i, result in enumerate(citations[:top_n], 1):
-        print(f"{i}. {result['title'][:70]}")
-        print(f"   └─ Relevance: {result['relevance_score']:.4f}")
-        print(f"      ├─ Semantic (SPECTER2): {result['semantic_similarity']:.4f}")
-        print(f"      ├─ Bib. Coupling: {result['bibliographic_coupling']:.4f}")
-        print(f"      ├─ Year Similarity: {result['year_similarity']:.4f}")
-        print(f"      ├─ Citation Score: {result['citation_score']:.4f}")
-        print(f"      └─ Path Probability: {result['path_probability']:.4f} (depth: {result['depth']})")
+def print_top_papers(
+    edges: List[RelevanceEdge],
+    paper_index: Dict[str, ResearchPaper],
+    top_n: int = 10,
+):
+    """Print top N papers by combined relevance score."""
+    print(f"\n{'=' * 100}")
+    print(f"TOP {top_n} MOST RELEVANT PAPERS")
+    print(f"{'=' * 100}\n")
+
+    # Sort by combined score (descending)
+    sorted_edges = sorted(
+        edges, key=lambda e: e.relevance_score.combined, reverse=True
+    )
+
+    for i, edge in enumerate(sorted_edges[:top_n], 1):
+        paper = paper_index.get(edge.dest_id)
+        title = paper.title if paper else f"[Unknown title] ({edge.dest_id})"
+        year = paper.year if paper else "N/A"
+        citations = paper.citation_count if paper else "N/A"
+
+        score = edge.relevance_score
+
+        print(f"{i}. {title[:70]}")
+        print(f"   └─ Relevance: {score.combined:.4f}")
+        print(f"      ├─ Semantic: {score.semantic_similarity:.4f}")
+        print(f"      ├─ Bib. Coupling: {score.bibliographic_coupling:.4f}")
+        print(f"      ├─ Year Similarity: {score.year_similarity:.4f}")
+        print(f"      └─ Citation Score: {score.citation_score:.4f}")
+        print(f"         (Year: {year}, Citations: {citations})")
         print()
 
 
-def print_stats(results: list):
+def print_stats(edges: List[RelevanceEdge]):
     """Print statistics about the scoring."""
-    if not results:
+    if not edges:
         return
-    
-    print(f"\n{'='*100}")
+
+    print(f"\n{'=' * 100}")
     print("SCORING STATISTICS")
-    print(f"{'='*100}\n")
-    
-    references = [r for r in results if r.get('edge_type') == 'reference']
-    citations = [r for r in results if r.get('edge_type') == 'citation']
-    
-    print(f"Total papers scored: {len(results)}")
-    print(f"  └─ References (solid lines): {len(references)}")
-    print(f"  └─ Citations (dashed lines): {len(citations)}")
-    
-    if results:
-        avg_semantic = sum(r['semantic_similarity'] for r in results) / len(results)
-        avg_bib = sum(r['bibliographic_coupling'] for r in results) / len(results)
-        avg_year = sum(r['year_similarity'] for r in results) / len(results)
-        
-        print(f"\nAverage semantic similarity: {avg_semantic:.4f}")
-        print(f"Average bibliographic coupling: {avg_bib:.4f}")
-        print(f"Average year similarity: {avg_year:.4f}")
+    print(f"{'=' * 100}\n")
+
+    print(f"Total papers scored: {len(edges)}")
+
+    avg_semantic = (
+        sum(e.relevance_score.semantic_similarity for e in edges) / len(edges)
+    )
+    avg_bib = sum(e.relevance_score.bibliographic_coupling for e in edges) / len(edges)
+    avg_year = sum(e.relevance_score.year_similarity for e in edges) / len(edges)
+    avg_citation = (
+        sum(e.relevance_score.citation_score for e in edges) / len(edges)
+    )
+    avg_combined = sum(e.relevance_score.combined for e in edges) / len(edges)
+
+    print(f"\nAverage semantic similarity: {avg_semantic:.4f}")
+    print(f"Average bibliographic coupling: {avg_bib:.4f}")
+    print(f"Average year similarity: {avg_year:.4f}")
+    print(f"Average citation score: {avg_citation:.4f}")
+    print(f"Average combined relevance: {avg_combined:.4f}")
     print()
 
 
 if __name__ == "__main__":
-    query = "antioxidants"
+    query = "phasor"
     papers = search(query)
 
     if not papers:
         print("No papers found for the query")
-        exit()
+        raise SystemExit(1)
 
     root_paper = papers[0]
-    print("="*100)
+    print("=" * 100)
     print(f"Root Paper: {root_paper.title}")
     print(f"Year: {root_paper.year or 'N/A'}")
     print(f"Citations: {root_paper.citation_count or 0}")
-    print("="*100)
+    print("=" * 100)
 
     # Configuration
-    depth = 2              # How many levels deep to traverse (both references and citations)
-    max_per_level = 10     # Max papers per level (both references and citations)
+    depth = 4  # How many levels deep to traverse (both references and citations)
+    max_per_level = 20  # Max papers per level (both references and citations)
     include_citations = True  # Whether to include citation edges
-    
+
     print(f"\nBuilding paper graph:")
     print(f"  Depth: {depth} levels")
     print(f"  Max per level: {max_per_level} papers")
     print(f"  Include citations: {include_citations}")
-    
+
     root_paper = build_full_graph(
         root_paper,
         depth=depth,
         max_per_level=max_per_level,
-        include_citations=include_citations
+        include_citations=include_citations,
     )
 
-    print("\nComputing relevance scores with SPECTER2...")
-    print("(This may take a few minutes on first run - downloading model and computing embeddings)")
-    
-    results, scorer = compute_relevance_scores(
-        root_paper,
-        max_depth=depth,
-        use_cache=True
-    )
-    
+    print("\nComputing relevance scores...")
+    edges = compute_relevance_scores(root_paper)
+
+    # Build paper index for easy lookup by id (for printing + CSV)
+    paper_index = index_papers(root_paper)
+
     # Create lookup map for visualization
-    scores_map = {r["paper_id"]: r for r in results}
-    
+    scores_map: Dict[str, RelevanceScore] = {
+        edge.dest_id: edge.relevance_score for edge in edges
+    }
+
     # Print statistics and top papers
-    print_stats(results)
-    print_top_papers(results, top_n=15)
-    
+    print_stats(edges)
+    print_top_papers(edges, paper_index, top_n=15)
+
     # Build and save graph
     print("\nGenerating visualization...")
     print("Legend:")
     print("  • Solid gray lines (→): References (this paper cites that paper)")
     print("  • Dashed purple lines (→): Citations (that paper cites this paper)")
-    
+
     net = build_graph_with_scores(root_paper, scores_map)
-    
+
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
-    
-    output_file = output_dir / "references_graph_specter2.html"
+
+    output_file = output_dir / "references_graph.html"
     net.write_html(str(output_file))
     print(f"✓ Graph saved to: {output_file}")
-    
+
     # Save scores to CSV
     import csv
-    csv_file = output_dir / "relevance_scores_specter2.csv"
-    with open(csv_file, 'w', newline='', encoding='utf-8') as f:
-        if results:
-            writer = csv.DictWriter(f, fieldnames=results[0].keys())
-            writer.writeheader()
-            writer.writerows(results)
+
+    csv_file = output_dir / "relevance_scores.csv"
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        fieldnames = [
+            "src_id",
+            "dest_id",
+            "paper_id",
+            "title",
+            "year",
+            "citation_count",
+            "semantic_similarity",
+            "bibliographic_coupling",
+            "year_similarity",
+            "citation_score",
+            "combined",
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for edge in edges:
+            paper = paper_index.get(edge.dest_id)
+            score = edge.relevance_score
+
+            writer.writerow(
+                {
+                    "src_id": edge.src_id,
+                    "dest_id": edge.dest_id,
+                    "paper_id": edge.dest_id,
+                    "title": paper.title if paper else "",
+                    "year": paper.year if paper else "",
+                    "citation_count": paper.citation_count if paper else "",
+                    "semantic_similarity": score.semantic_similarity,
+                    "bibliographic_coupling": score.bibliographic_coupling,
+                    "year_similarity": score.year_similarity,
+                    "citation_score": score.citation_score,
+                    "combined": score.combined,
+                }
+            )
+
     print(f"✓ Scores saved to: {csv_file}")
-    
-    print(f"\n{'='*100}")
+
+    print(f"\n{'=' * 100}")
     print("Done! Open the HTML file in your browser to explore the graph.")
-    print(f"{'='*100}")
+    print(f"{'=' * 100}")
