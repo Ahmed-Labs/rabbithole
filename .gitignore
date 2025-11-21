@@ -2,6 +2,6 @@ venv/
 lib/
 paper_retrieval/output/
 paper_retrieval/__pycache__/
-semantic_similarity/output/
-semantic_similarity/__pycache__/
+experiments/output/
+experiments/__pycache__/
 .embedding_cache/
