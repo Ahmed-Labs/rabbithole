@@ -1,9 +1,15 @@
-import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
+import requests_cache
 
 def create_session():
+    session = requests_cache.CachedSession(
+        backend="redis",
+        cache_name="httpcache",
+        expire_after=60 * 60 * 24,
+        allowable_methods=("GET", "POST"),
+    )
+
     retries = Retry(
         total=5,
         backoff_factor=1,
@@ -11,9 +17,9 @@ def create_session():
         allowed_methods=["GET", "POST"],
     )
     adapter = HTTPAdapter(max_retries=retries)
-    session = requests.Session()
     session.mount("http://", adapter)
     session.mount("https://", adapter)
+
     session.headers.update(
         {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -21,7 +27,7 @@ def create_session():
             "Chrome/118.0.5993.70 Safari/537.36"
         }
     )
-    return session
 
+    return session
 
 session = create_session()

@@ -1,5 +1,3 @@
-import io
-import fitz
 from typing import Optional
 from paper_retrieval.session import session as r
 from paper_retrieval.research_paper import ResearchPaper, new_research_paper
@@ -133,7 +131,7 @@ def get_citations_recur(
     if depth <= 0:
         return paper
 
-    paper.citations = get_citations(paper.id, max_results=max_citations)
+    paper.citations = paper.citations or get_citations(paper.id, max_results=max_citations)
     for citing_paper in paper.citations:
         get_citations_recur(citing_paper, depth - 1, max_citations)
 
@@ -166,17 +164,3 @@ def build_full_graph(
         get_citations_recur(root_paper, depth=depth, max_citations=max_per_level)
     
     return root_paper
-
-
-def fetch_pdf_text(pdf_url: str) -> str:
-    resp = r.get(pdf_url, headers={"User-Agent": "Mozilla/5.0"})
-    resp.raise_for_status()
-
-    pdf_bytes = io.BytesIO(resp.content)
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-
-    text_chunks = []
-    for page in doc:
-        text_chunks.append(page.get_text())
-
-    return "\n".join(text_chunks)

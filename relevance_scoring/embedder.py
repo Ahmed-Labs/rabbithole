@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Callable
 from transformers import AutoTokenizer
 from adapters import AutoAdapterModel
 from sklearn.metrics.pairwise import cosine_similarity
@@ -76,6 +76,10 @@ class Embedder:
             cached = self.cache.get(cache_key)
             if cached is not None:
                 return cached
+            
+        if not chunks:
+            fallback = self.embed("", cache_key)
+            return fallback
 
         # Tokenize all chunks together
         inputs = self.tokenizer(
@@ -101,6 +105,21 @@ class Embedder:
             self.cache.set(cache_key, mean_pooled_embedding)
 
         return mean_pooled_embedding
+    
+    def lazy_embed_chunks(
+        self,
+        get_chunks: Callable[[], List[str]],
+        cache_key: Optional[str] = None,
+    ) -> np.ndarray:
+        # Check cache before attempting to fetch full text
+        if cache_key:
+            cached = self.cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        chunks = get_chunks()
+        return self.embed_chunks(chunks, cache_key=cache_key)
+
 
     def compute_similarity(
         self, embedding1: np.ndarray, embedding2: np.ndarray

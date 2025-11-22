@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Set
 from dataclasses import dataclass
 import numpy as np
 
@@ -44,16 +44,6 @@ class RelevanceScorer:
     def __init__(self):
         self.embedder = Embedder()
 
-    def _get_paper_text(self, paper) -> str:
-        """
-        Extract text representation from a paper.
-        SPECTER2 is trained on title+abstract with SEP token between them.
-        """
-        title = paper.title or ""
-        abstract = paper.abstract or ""
-        # SPECTER2 uses SEP token between title and abstract
-        return f"{title} {abstract}".strip()
-
     def _compute_year_similarity(
         self, year1: Optional[int], year2: Optional[int]
     ) -> float:
@@ -97,29 +87,39 @@ class RelevanceScorer:
         # Score: 0.5 at 100 citations, ~0.7 at 1000 citations
         return min(0.5 + np.log10(paper.citation_count + 1) / 6, 1.0)
 
+    def _compute_semantic_similarity(
+        self, root_paper: ResearchPaper, target_paper: ResearchPaper
+    ) -> float:
+        root_embs = self.embedder.lazy_embed_chunks(
+            lambda: root_paper.full_text_chunks, cache_key=root_paper.id + ":text"
+        )
+        target_embs = self.embedder.lazy_embed_chunks(
+            lambda: target_paper.full_text_chunks, cache_key=target_paper.id + ":text"
+        )
+
+        full_text_sim = self.embedder.compute_similarity(root_embs, target_embs)
+
+        root_meta_emb = self.embedder.embed(root_paper.meta, root_paper.id + ":meta")
+        target_meta_emb = self.embedder.embed(
+            target_paper.meta, target_paper.id + ":meta"
+        )
+        meta_sim = self.embedder.compute_similarity(root_meta_emb, target_meta_emb)
+        return 0.8 * full_text_sim + 0.2 * meta_sim
+
     def compute_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
-    ) -> RelevanceScore:
-        # Compute semantic similarity
-        root_text = self._get_paper_text(root_paper)
-        target_text = self._get_paper_text(target_paper)
-
-        root_emb = self.embedder.embed(root_text, root_paper.id)
-        target_emb = self.embedder.embed(target_text, target_paper.id)
-
-        semantic_sim = self.embedder.compute_similarity(root_emb, target_emb)
-
-        # Compute other relevance factors
-        bib_coupling = self._compute_bibliographic_coupling(root_paper, target_paper)
-        year_sim = self._compute_year_similarity(root_paper.year, target_paper.year)
-
-        citation_score = self._get_citation_score(target_paper)
-
+    ) -> Optional[RelevanceScore]:
         return RelevanceScore(
-            semantic_similarity=semantic_sim,
-            bibliographic_coupling=bib_coupling,
-            year_similarity=year_sim,
-            citation_score=citation_score,
+            semantic_similarity=self._compute_semantic_similarity(
+                root_paper, target_paper
+            ),
+            bibliographic_coupling=self._compute_bibliographic_coupling(
+                root_paper, target_paper
+            ),
+            year_similarity=self._compute_year_similarity(
+                root_paper.year, target_paper.year
+            ),
+            citation_score=self._get_citation_score(target_paper),
         )
 
     def compute_relevance_edges(
@@ -129,32 +129,36 @@ class RelevanceScorer:
         """
         Recursively score all papers in reference tree against root paper.
         """
-        edges = []
-        computed_edges = set()
+        edges: List[RelevanceEdge] = []
 
-        def recur(curr_paper: ResearchPaper):
-            adjacent_papers = curr_paper.references + curr_paper.citations
+        visited: Set[str] = set()
+        scored: Set[str] = set()
+
+        def dfs(paper: ResearchPaper):
+            if paper.id in visited:
+                return
+            visited.add(paper.id)
+
+            adjacent_papers = paper.references + paper.citations
             if not adjacent_papers:
-                return []
+                return
 
             for adj in adjacent_papers:
-                if (root_paper.id, adj.id) in computed_edges:
-                    continue
-                
-                score = self.compute_score(root_paper, adj)
+                if adj.id not in scored:
+                    score = self.compute_score(root_paper, adj)
+                    if score:
+                        edges.append(
+                            RelevanceEdge(
+                                src_id=root_paper.id,
+                                dest_id=adj.id,
+                                relevance_score=score,
+                            )
+                        )
+                    scored.add(adj.id)
 
-                edges.append(
-                    RelevanceEdge(
-                        src_id=root_paper.id,
-                        dest_id=adj.id,
-                        relevance_score=score,
-                    )
-                )
-                computed_edges.add((root_paper.id, adj.id))
-                computed_edges.add((adj.id, root_paper.id))
-                recur(adj)
+                dfs(adj)
 
-        recur(root_paper)
+        dfs(root_paper)
         return edges
 
 
