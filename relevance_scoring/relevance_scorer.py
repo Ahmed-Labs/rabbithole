@@ -11,9 +11,13 @@ class RelevanceScore:
     semantic_similarity: float
     year_similarity: float
     citation_score: float
+    llm_explanation: Optional[str] = None  # Optional explanation from LLM
+    llm_semantic_score: Optional[float] = None  # Optional LLM-based semantic score
 
     @property
     def combined(self):
+        # Use LLM semantic score if available, otherwise use embedding-based
+        semantic = self.llm_semantic_score if self.llm_semantic_score is not None else self.semantic_similarity
         return (
             0.75 * self.semantic_similarity
             + 0.15 * self.year_similarity
@@ -26,6 +30,8 @@ class RelevanceEdge:
     src_id: str
     dest_id: str
     relevance_score: RelevanceScore
+    edge_type: str = "reference"  # "reference" or "citation"
+    depth: int = 1
 
 
 class RelevanceScorer:
@@ -33,9 +39,11 @@ class RelevanceScorer:
     Compute semantic relevance scores between papers.
 
     Relevance scores consist of:
-    - Semnatic similarity
+    - Semantic similarity (SPECTER2 embeddings or LLM-based)
     - Co-citation analysis (papers cited together)
     - Publication year proximity
+    
+    Can optionally use LLM for semantic scoring and explanations.
     """
 
     def __init__(self):
@@ -140,12 +148,83 @@ class RelevanceScorer:
         return edges
 
 
-def compute_relevance_scores(root_paper) -> Tuple[List[RelevanceEdge]]:
-    scorer = RelevanceScorer()
+def compute_relevance_scores(
+    root_paper,
+    use_llm: bool = False,
+    llm_scorer=None,
+    max_depth: Optional[int] = None,
+    use_cache: bool = True
+) -> Tuple[List[dict], RelevanceScorer]:
+    """
+    Compute relevance scores for all papers in the graph.
+    
+    Args:
+        root_paper: The root paper to score against
+        use_llm: Whether to use LLM for semantic scoring
+        llm_scorer: Optional LLMScorer instance (created if use_llm=True and None)
+        max_depth: Optional max depth (currently unused, kept for compatibility)
+        use_cache: Whether to use embedding cache (currently unused, kept for compatibility)
+    
+    Returns:
+        Tuple of (results_list, scorer) where results_list is a list of dicts with:
+        - paper_id: str
+        - title: str
+        - relevance_score: float
+        - semantic_similarity: float
+        - bibliographic_coupling: float
+        - year_similarity: float
+        - citation_score: float
+        - llm_explanation: Optional[str]
+        - edge_type: str ("reference" or "citation")
+        - depth: int
+        - path_probability: float (placeholder, currently 1.0)
+    """
+    scorer = RelevanceScorer(use_llm=use_llm, llm_scorer=llm_scorer)
 
     print("\nComputing relevance scores...")
+    if use_llm:
+        print("Using LLM for semantic scoring and explanations...")
     edges = scorer.compute_relevance_edges(root_paper)
 
     edges.sort(key=lambda x: x.relevance_score.combined, reverse=True)
 
-    return edges
+    # Convert edges to dictionary format expected by visualization
+    results = []
+    paper_map = {}  # Map paper IDs to paper objects for title lookup
+    
+    def collect_papers(paper, depth=0):
+        """Recursively collect all papers in the graph."""
+        if paper.id not in paper_map:
+            paper_map[paper.id] = paper
+        for ref in paper.references:
+            if ref.id not in paper_map:
+                paper_map[ref.id] = ref
+                collect_papers(ref, depth + 1)
+        for cit in paper.citations:
+            if cit.id not in paper_map:
+                paper_map[cit.id] = cit
+                collect_papers(cit, depth + 1)
+    
+    collect_papers(root_paper)
+    
+    for edge in edges:
+        target_paper = paper_map.get(edge.dest_id)
+        if not target_paper:
+            continue
+        
+        result = {
+            "paper_id": edge.dest_id,
+            "title": target_paper.title if target_paper else "Unknown",
+            "relevance_score": edge.relevance_score.combined,
+            "semantic_similarity": edge.relevance_score.semantic_similarity,
+            "bibliographic_coupling": edge.relevance_score.bibliographic_coupling,
+            "year_similarity": edge.relevance_score.year_similarity,
+            "citation_score": edge.relevance_score.citation_score,
+            "llm_explanation": edge.relevance_score.llm_explanation,
+            "edge_type": edge.edge_type,
+            "depth": edge.depth,
+            "path_probability": 1.0,  # Placeholder
+        }
+        results.append(result)
+
+    return results, scorer

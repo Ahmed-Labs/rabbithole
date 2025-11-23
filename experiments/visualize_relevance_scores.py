@@ -254,12 +254,31 @@ if __name__ == "__main__":
         include_citations=include_citations,
     )
 
-    print("\nComputing relevance scores...")
-    edges = compute_relevance_scores(root_paper)
-
-    # Build paper index for easy lookup by id (for printing + CSV)
-    paper_index = index_papers(root_paper)
-
+    # Configuration: Set to True to use LLM for scoring and explanations
+    use_llm = False  # Change to True to enable LLM-based scoring
+    
+    if use_llm:
+        print("\nComputing relevance scores with LLM...")
+        print("(This will use API calls - make sure you have API keys set)")
+        from relevance_scoring import LLMScorer
+        llm_scorer = LLMScorer(
+            provider="openai",  # Options: "openai", "anthropic", "huggingface"
+            model="gpt-4o-mini",  # Cost-effective default
+            use_explanations=True
+        )
+    else:
+        print("\nComputing relevance scores with SPECTER2...")
+        print("(This may take a few minutes on first run - downloading model and computing embeddings)")
+        llm_scorer = None
+    
+    results, scorer = compute_relevance_scores(
+        root_paper,
+        use_llm=use_llm,
+        llm_scorer=llm_scorer,
+        max_depth=depth,
+        use_cache=True
+    )
+    
     # Create lookup map for visualization
     scores_map: Dict[str, RelevanceScore] = {
         edge.dest_id: edge.relevance_score for edge in edges

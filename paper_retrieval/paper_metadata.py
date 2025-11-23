@@ -164,3 +164,43 @@ def build_full_graph(
         get_citations_recur(root_paper, depth=depth, max_citations=max_per_level)
     
     return root_paper
+
+
+def get_paper_by_id(paper_id: str) -> Optional[ResearchPaper]:
+    """
+    Get a paper by its Semantic Scholar paper ID.
+    
+    Args:
+        paper_id: Semantic Scholar paper ID (e.g., "204e3073870fae3d05bcbc2f6a8e263d9a72c776")
+    
+    Returns:
+        ResearchPaper object if found, None otherwise
+    
+    Example:
+        paper = get_paper_by_id("204e3073870fae3d05bcbc2f6a8e263d9a72c776")
+    """
+    url = f"{API_URL}/paper/{paper_id}"
+    params = {"fields": DEFAULT_FIELDS}
+    
+    try:
+        resp = r.get(url, params=params)
+        resp.raise_for_status()
+        paper_data = resp.json()
+        return new_research_paper(paper_data)
+    except Exception as e:
+        print(f"Error fetching paper {paper_id}: {e}")
+        return None
+
+
+def fetch_pdf_text(pdf_url: str) -> str:
+    resp = r.get(pdf_url, headers={"User-Agent": "Mozilla/5.0"})
+    resp.raise_for_status()
+
+    pdf_bytes = io.BytesIO(resp.content)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    text_chunks = []
+    for page in doc:
+        text_chunks.append(page.get_text())
+
+    return "\n".join(text_chunks)
