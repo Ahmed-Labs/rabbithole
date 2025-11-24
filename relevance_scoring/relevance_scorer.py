@@ -15,9 +15,9 @@ class RelevanceScore:
     @property
     def combined(self):
         return (
-            0.85 * self.semantic_similarity
-            + 0.10 * self.year_similarity
-            + 0.05 * self.citation_score
+            0.75 * self.semantic_similarity
+            + 0.15 * self.year_similarity
+            + 0.10 * self.citation_score
         )
 
 

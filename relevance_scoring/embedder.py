@@ -98,13 +98,13 @@ class Embedder:
             # [batch, seq, hidden] → [batch, hidden] using CLS
             embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
 
-        # Mean pool across chunks
-        mean_pooled_embedding = embeddings.mean(axis=0)
+        # Max pool across chunks
+        max_pool_embedding = embeddings.max(axis=0)
 
         if cache_key:
-            self.cache.set(cache_key, mean_pooled_embedding)
+            self.cache.set(cache_key, max_pool_embedding)
 
-        return mean_pooled_embedding
+        return max_pool_embedding
     
     def lazy_embed_chunks(
         self,

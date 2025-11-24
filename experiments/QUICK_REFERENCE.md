@@ -49,9 +49,9 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
 
 ```python
 combined_score = (
-    0.85 * semantic_similarity +
-    0.10 * year_similarity +
-    0.05 * citation_score
+    0.75 * semantic_similarity +
+    0.15 * year_similarity +
+    0.10 * citation_score
 )
 ```
 
@@ -74,9 +74,9 @@ Edit `semantic_similarity/relevance_scorer.py`, line ~210:
 
 ```python
 combined = (
-    0.85 * semantic_sim +      # ← Increase if content matters most
-    0.10 * year_sim +          # ← Increase if recency matters
-    0.05 * citation_score      # ← Increase if popularity matters
+    0.75 * semantic_sim +      # ← Increase if content matters most
+    0.15 * year_sim +          # ← Increase if recency matters
+    0.10 * citation_score      # ← Increase if popularity matters
 )
 ```
 
