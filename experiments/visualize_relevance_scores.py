@@ -108,9 +108,33 @@ def build_graph_with_scores(
                 f"Citations: {paper.citation_count or 0}"
             )
             
-            # Add LLM explanation if available
+            # Add LLM explanation if available (wrapped to multiple lines)
             if llm_explanation:
-                score_info += f"\n\n💡 LLM Explanation:\n{llm_explanation}"
+                # Wrap explanation to multiple lines (max 60 chars per line for tooltip readability)
+                max_line_length = 150
+                words = llm_explanation.split()
+                wrapped_lines = []
+                current_line = []
+                current_length = 0
+                
+                for word in words:
+                    word_len = len(word)
+                    # If adding this word would exceed the line length, start a new line
+                    if current_length + word_len + 1 > max_line_length and current_line:
+                        wrapped_lines.append(' '.join(current_line))
+                        current_line = [word]
+                        current_length = word_len
+                    else:
+                        current_line.append(word)
+                        current_length += word_len + (1 if current_line else 0)
+                
+                # Add the last line
+                if current_line:
+                    wrapped_lines.append(' '.join(current_line))
+                
+                # Join with newlines for display
+                wrapped_explanation = '\n'.join(wrapped_lines)
+                score_info += f"\n\n💡 LLM Explanation:\n{wrapped_explanation}"
 
         # Add node with score information
         if depth == 0:
@@ -124,6 +148,7 @@ def build_graph_with_scores(
                 f"Rel: {relevance_for_label:.3f}"
             )
 
+        # Use newlines directly - pyvis tooltips handle them automatically
         node_title = f"{paper.title}\n\n{score_info}"
 
         net.add_node(
@@ -260,8 +285,8 @@ if __name__ == "__main__":
     print("=" * 100)
 
     # Configuration
-    depth = 2  # How many levels deep to traverse (both references and citations)
-    max_per_level = 10  # Max papers per level (both references and citations)
+    depth = 1  # How many levels deep to traverse (both references and citations)
+    max_per_level = 1  # Max papers per level (both references and citations)
     include_citations = True  # Whether to include citation edges
 
     print(f"\nBuilding paper graph:")
