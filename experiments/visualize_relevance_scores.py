@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, List
 
+from dotenv import load_dotenv
 from pyvis.network import Network
 
 from paper_retrieval.paper_metadata import search, build_full_graph
@@ -10,6 +11,9 @@ from relevance_scoring.relevance_scorer import (
     RelevanceEdge,
     RelevanceScore,
 )
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def index_papers(root: ResearchPaper) -> Dict[str, ResearchPaper]:
@@ -83,16 +87,30 @@ def build_graph_with_scores(
                 semantic = score.semantic_similarity
                 year_sim = score.year_similarity
                 citation_score = score.citation_score
+                llm_score = score.llm_semantic_score
+                llm_explanation = score.llm_explanation
 
             color = get_color_by_score(relevance)
+            
+            # Build score info with LLM explanation if available
             score_info = (
                 f"Relevance: {relevance:.3f}\n"
                 f"Semantic: {semantic:.3f} | "
                 f"YearSim: {year_sim:.3f} | "
                 f"CitationScore: {citation_score:.3f}\n"
+            )
+            
+            if llm_score is not None:
+                score_info += f"LLM Score: {llm_score:.3f}\n"
+            
+            score_info += (
                 f"Year: {paper.year or 'N/A'} | "
                 f"Citations: {paper.citation_count or 0}"
             )
+            
+            # Add LLM explanation if available
+            if llm_explanation:
+                score_info += f"\n\n💡 LLM Explanation:\n{llm_explanation}"
 
         # Add node with score information
         if depth == 0:
@@ -190,8 +208,12 @@ def print_top_papers(
         print(f"   └─ Relevance: {score.combined:.4f}")
         print(f"      ├─ Semantic: {score.semantic_similarity:.4f}")
         print(f"      ├─ Year Similarity: {score.year_similarity:.4f}")
-        print(f"      └─ Citation Score: {score.citation_score:.4f}")
-        print(f"         (Year: {year}, Citations: {citations})")
+        print(f"      ├─ Citation Score: {score.citation_score:.4f}")
+        if score.llm_semantic_score is not None:
+            print(f"      ├─ LLM Score: {score.llm_semantic_score:.4f}")
+        print(f"      └─ (Year: {year}, Citations: {citations})")
+        if edge.llm_explanation:
+            print(f"\n      💡 LLM Explanation: {edge.llm_explanation}")
         print()
 
 
@@ -238,8 +260,8 @@ if __name__ == "__main__":
     print("=" * 100)
 
     # Configuration
-    depth = 4  # How many levels deep to traverse (both references and citations)
-    max_per_level = 20  # Max papers per level (both references and citations)
+    depth = 2  # How many levels deep to traverse (both references and citations)
+    max_per_level = 10  # Max papers per level (both references and citations)
     include_citations = True  # Whether to include citation edges
 
     print(f"\nBuilding paper graph:")
@@ -254,22 +276,16 @@ if __name__ == "__main__":
         include_citations=include_citations,
     )
 
-    # Configuration: Set to True to use LLM for scoring and explanations
-    use_llm = False  # Change to True to enable LLM-based scoring
+    # LLM scoring is now automatically enabled
+    # Set use_llm=False to disable if needed
+    use_llm = True  # LLM scoring is automatic by default
     
-    if use_llm:
-        print("\nComputing relevance scores with LLM...")
-        print("(This will use API calls - make sure you have API keys set)")
-        from relevance_scoring import LLMScorer
-        llm_scorer = LLMScorer(
-            provider="openai",  # Options: "openai", "anthropic", "huggingface"
-            model="gpt-4o-mini",  # Cost-effective default
-            use_explanations=True
-        )
-    else:
-        print("\nComputing relevance scores with SPECTER2...")
-        print("(This may take a few minutes on first run - downloading model and computing embeddings)")
-        llm_scorer = None
+    print("\nComputing relevance scores with LLM (automatic)...")
+    print("(This will use API calls - make sure you have API keys set)")
+    print("(Using GPT-5-nano for scoring and explanations)")
+    
+    # LLM scorer will be created automatically by compute_relevance_scores
+    llm_scorer = None
     
     results, scorer = compute_relevance_scores(
         root_paper,
@@ -279,7 +295,11 @@ if __name__ == "__main__":
         use_cache=True
     )
     
-    # Create lookup map for visualization
+    # Get edges from scorer for visualization
+    edges = scorer.compute_relevance_edges(root_paper)
+    paper_index = index_papers(root_paper)
+    
+    # Create lookup map for visualization (paper_id -> RelevanceScore)
     scores_map: Dict[str, RelevanceScore] = {
         edge.dest_id: edge.relevance_score for edge in edges
     }
@@ -318,6 +338,8 @@ if __name__ == "__main__":
             "semantic_similarity",
             "year_similarity",
             "citation_score",
+            "llm_relevance_score",
+            "llm_explanation",
             "combined",
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -338,6 +360,8 @@ if __name__ == "__main__":
                     "semantic_similarity": score.semantic_similarity,
                     "year_similarity": score.year_similarity,
                     "citation_score": score.citation_score,
+                    "llm_relevance_score": score.llm_semantic_score if score.llm_semantic_score is not None else "",
+                    "llm_explanation": edge.llm_explanation if edge.llm_explanation else "",
                     "combined": score.combined,
                 }
             )

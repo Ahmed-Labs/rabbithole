@@ -9,7 +9,7 @@ torch>=2.0.0
 transformers>=4.30.0
 adapters>=0.2.0
 # Optional LLM dependencies (install only if using LLM scoring)
-# openai>=1.0.0  # For OpenAI API
-# anthropic>=0.18.0  # For Anthropic Claude API
+openai>=1.0.0  # For OpenAI API
+python-dotenv  # For loading .env files
 redis
 requests-cache

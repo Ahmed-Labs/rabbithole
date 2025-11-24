@@ -23,6 +23,12 @@ class RelevanceScore:
             + 0.15 * self.year_similarity
             + 0.10 * self.citation_score
         )
+        
+        # Combine with LLM score if available: 0.5 * existing + 0.5 * LLM
+        if self.llm_semantic_score is not None:
+            return 0.5 * existing_score + 0.5 * self.llm_semantic_score
+        else:
+            return existing_score
 
 
 @dataclass
@@ -32,6 +38,7 @@ class RelevanceEdge:
     relevance_score: RelevanceScore
     edge_type: str = "reference"  # "reference" or "citation"
     depth: int = 1
+    llm_explanation: Optional[str] = None  # LLM explanation for this edge
 
 
 class RelevanceScorer:
@@ -42,12 +49,21 @@ class RelevanceScorer:
     - Semantic similarity (SPECTER2 embeddings or LLM-based)
     - Co-citation analysis (papers cited together)
     - Publication year proximity
+    - Citation score
+    - LLM relevance score (optional, combined with existing score)
     
-    Can optionally use LLM for semantic scoring and explanations.
+    Uses LLM for additional scoring and explanations when provided.
     """
 
-    def __init__(self):
+    def __init__(self, llm_scorer=None):
+        """
+        Initialize relevance scorer.
+        
+        Args:
+            llm_scorer: Optional LLMScorer instance for LLM-based scoring
+        """
         self.embedder = Embedder()
+        self.llm_scorer = llm_scorer
 
     def _compute_year_similarity(
         self, year1: Optional[int], year2: Optional[int]
@@ -98,7 +114,28 @@ class RelevanceScorer:
     def compute_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
     ) -> Optional[RelevanceScore]:
+        # Compute base scores (SPECTER2-based)
+        semantic_sim = self._compute_semantic_similarity(root_paper, target_paper)
+        bib_coupling = self._compute_bibliographic_coupling(root_paper, target_paper)
+        year_sim = self._compute_year_similarity(root_paper.year, target_paper.year)
+        citation_score = self._get_citation_score(target_paper)
+        
+        # Compute LLM score if available
+        llm_score = None
+        llm_explanation = None
+        if self.llm_scorer:
+            try:
+                llm_result = self.llm_scorer.compute_score(root_paper, target_paper)
+                llm_score = llm_result.get("relevance_score")
+                llm_explanation = llm_result.get("explanation")
+                # Store LLM score in target paper
+                target_paper.llm_relevance_score = llm_score
+            except Exception as e:
+                print(f"Warning: LLM scoring failed: {e}")
+        
         return RelevanceScore(
+            llm_semantic_score=llm_score,
+            llm_explanation=llm_explanation,
             semantic_similarity=self._compute_semantic_similarity(
                 root_paper, target_paper
             ),
@@ -133,11 +170,16 @@ class RelevanceScorer:
                 if adj.id not in scored:
                     score = self.compute_score(root_paper, adj)
                     if score:
+                        # Determine edge type
+                        edge_type = "reference" if adj in paper.references else "citation"
+                        
                         edges.append(
                             RelevanceEdge(
                                 src_id=root_paper.id,
                                 dest_id=adj.id,
                                 relevance_score=score,
+                                edge_type=edge_type,
+                                llm_explanation=score.llm_explanation,
                             )
                         )
                     scored.add(adj.id)
@@ -150,7 +192,7 @@ class RelevanceScorer:
 
 def compute_relevance_scores(
     root_paper,
-    use_llm: bool = False,
+    use_llm: bool = True,  # Default to True - LLM scoring is now automatic
     llm_scorer=None,
     max_depth: Optional[int] = None,
     use_cache: bool = True
@@ -158,10 +200,12 @@ def compute_relevance_scores(
     """
     Compute relevance scores for all papers in the graph.
     
+    LLM scoring is automatically enabled. Set use_llm=False to disable.
+    
     Args:
         root_paper: The root paper to score against
-        use_llm: Whether to use LLM for semantic scoring
-        llm_scorer: Optional LLMScorer instance (created if use_llm=True and None)
+        use_llm: Whether to use LLM for semantic scoring (default: True)
+        llm_scorer: Optional LLMScorer instance (created automatically if None and use_llm=True)
         max_depth: Optional max depth (currently unused, kept for compatibility)
         use_cache: Whether to use embedding cache (currently unused, kept for compatibility)
     
@@ -179,11 +223,25 @@ def compute_relevance_scores(
         - depth: int
         - path_probability: float (placeholder, currently 1.0)
     """
-    scorer = RelevanceScorer(use_llm=use_llm, llm_scorer=llm_scorer)
+    # Initialize LLM scorer automatically (unless explicitly disabled)
+    if use_llm and llm_scorer is None:
+        try:
+            from relevance_scoring.llm_scorer import LLMScorer
+            llm_scorer = LLMScorer(use_explanations=True)
+            print("✓ LLM scorer initialized (GPT-5-nano)")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not initialize LLM scorer: {e}")
+            print("   Continuing without LLM scoring...")
+            llm_scorer = None
+            use_llm = False
+    
+    scorer = RelevanceScorer(llm_scorer=llm_scorer)
 
     print("\nComputing relevance scores...")
     if use_llm:
-        print("Using LLM for semantic scoring and explanations...")
+        print("Using LLM (GPT-5-nano) for semantic scoring and explanations...")
+    else:
+        print("Using SPECTER2 embeddings only (LLM disabled)...")
     edges = scorer.compute_relevance_edges(root_paper)
 
     edges.sort(key=lambda x: x.relevance_score.combined, reverse=True)
@@ -220,7 +278,8 @@ def compute_relevance_scores(
             "bibliographic_coupling": edge.relevance_score.bibliographic_coupling,
             "year_similarity": edge.relevance_score.year_similarity,
             "citation_score": edge.relevance_score.citation_score,
-            "llm_explanation": edge.relevance_score.llm_explanation,
+            "llm_explanation": edge.llm_explanation,  # Get from edge, not score
+            "llm_relevance_score": edge.relevance_score.llm_semantic_score,
             "edge_type": edge.edge_type,
             "depth": edge.depth,
             "path_probability": 1.0,  # Placeholder
