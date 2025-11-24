@@ -76,13 +76,11 @@ def build_graph_with_scores(
             if score is None:
                 relevance = 0.0
                 semantic = 0.0
-                bib_coupling = 0.0
                 year_sim = 0.0
                 citation_score = 0.0
             else:
                 relevance = score.combined
                 semantic = score.semantic_similarity
-                bib_coupling = score.bibliographic_coupling
                 year_sim = score.year_similarity
                 citation_score = score.citation_score
 
@@ -90,7 +88,6 @@ def build_graph_with_scores(
             score_info = (
                 f"Relevance: {relevance:.3f}\n"
                 f"Semantic: {semantic:.3f} | "
-                f"BibCoupling: {bib_coupling:.3f}\n"
                 f"YearSim: {year_sim:.3f} | "
                 f"CitationScore: {citation_score:.3f}\n"
                 f"Year: {paper.year or 'N/A'} | "
@@ -192,7 +189,6 @@ def print_top_papers(
         print(f"{i}. {title[:70]}")
         print(f"   └─ Relevance: {score.combined:.4f}")
         print(f"      ├─ Semantic: {score.semantic_similarity:.4f}")
-        print(f"      ├─ Bib. Coupling: {score.bibliographic_coupling:.4f}")
         print(f"      ├─ Year Similarity: {score.year_similarity:.4f}")
         print(f"      └─ Citation Score: {score.citation_score:.4f}")
         print(f"         (Year: {year}, Citations: {citations})")
@@ -213,7 +209,6 @@ def print_stats(edges: List[RelevanceEdge]):
     avg_semantic = (
         sum(e.relevance_score.semantic_similarity for e in edges) / len(edges)
     )
-    avg_bib = sum(e.relevance_score.bibliographic_coupling for e in edges) / len(edges)
     avg_year = sum(e.relevance_score.year_similarity for e in edges) / len(edges)
     avg_citation = (
         sum(e.relevance_score.citation_score for e in edges) / len(edges)
@@ -221,7 +216,6 @@ def print_stats(edges: List[RelevanceEdge]):
     avg_combined = sum(e.relevance_score.combined for e in edges) / len(edges)
 
     print(f"\nAverage semantic similarity: {avg_semantic:.4f}")
-    print(f"Average bibliographic coupling: {avg_bib:.4f}")
     print(f"Average year similarity: {avg_year:.4f}")
     print(f"Average citation score: {avg_citation:.4f}")
     print(f"Average combined relevance: {avg_combined:.4f}")
@@ -303,7 +297,6 @@ if __name__ == "__main__":
             "year",
             "citation_count",
             "semantic_similarity",
-            "bibliographic_coupling",
             "year_similarity",
             "citation_score",
             "combined",
@@ -324,7 +317,6 @@ if __name__ == "__main__":
                     "year": paper.year if paper else "",
                     "citation_count": paper.citation_count if paper else "",
                     "semantic_similarity": score.semantic_similarity,
-                    "bibliographic_coupling": score.bibliographic_coupling,
                     "year_similarity": score.year_similarity,
                     "citation_score": score.citation_score,
                     "combined": score.combined,

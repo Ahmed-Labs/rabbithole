@@ -32,7 +32,6 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
 1. Paper Title Here
    └─ Relevance: 0.6800
       ├─ Semantic (SPECTER2): 0.8500
-      ├─ Bib. Coupling: 0.1200
       ├─ Year Similarity: 0.9500
       └─ Citation Score: 0.7000
 ```
@@ -43,7 +42,6 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
 |-------|-------|---------|
 | **Relevance** | 0-1 | Final combined score (this is what you care about) |
 | **Semantic** | 0-1 | How similar the paper content is (SPECTER2 embeddings) |
-| **Bib. Coupling** | 0-1 | Ratio of shared references (ConnectedPapers method) |
 | **Year Similarity** | 0-1 | How close in publication year (1.0 = same year) |
 | **Citation Score** | 0-1 | Normalized citation count (more = better) |
 
@@ -51,8 +49,7 @@ TOP 15 MOST RELEVANT PAPERS (SPECTER2 + ConnectedPapers-style scoring)
 
 ```python
 combined_score = (
-    0.70 * semantic_similarity +
-    0.15 * bibliographic_coupling +
+    0.85 * semantic_similarity +
     0.10 * year_similarity +
     0.05 * citation_score
 )
@@ -77,8 +74,7 @@ Edit `semantic_similarity/relevance_scorer.py`, line ~210:
 
 ```python
 combined = (
-    0.70 * semantic_sim +      # ← Increase if content matters most
-    0.15 * bib_coupling +      # ← Increase if shared refs matter
+    0.85 * semantic_sim +      # ← Increase if content matters most
     0.10 * year_sim +          # ← Increase if recency matters
     0.05 * citation_score      # ← Increase if popularity matters
 )
@@ -132,8 +128,7 @@ query = "machine learning transformers"
 ```python
 # In relevance_scorer.py, line ~210
 combined = (
-    0.60 * semantic_sim +
-    0.10 * bib_coupling +
+    0.70 * semantic_sim +
     0.25 * year_sim +        # ← Increased from 0.10
     0.05 * citation_score
 )

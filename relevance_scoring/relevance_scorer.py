@@ -9,15 +9,13 @@ from paper_retrieval import ResearchPaper
 @dataclass
 class RelevanceScore:
     semantic_similarity: float
-    bibliographic_coupling: float
     year_similarity: float
     citation_score: float
 
     @property
     def combined(self):
         return (
-            0.70 * self.semantic_similarity
-            + 0.15 * self.bibliographic_coupling
+            0.85 * self.semantic_similarity
             + 0.10 * self.year_similarity
             + 0.05 * self.citation_score
         )
@@ -37,7 +35,6 @@ class RelevanceScorer:
     Relevance scores consist of:
     - Semnatic similarity
     - Co-citation analysis (papers cited together)
-    - Bibliographic coupling (papers sharing references)
     - Publication year proximity
     """
 
@@ -58,22 +55,6 @@ class RelevanceScorer:
 
         # Decay function: 1.0 at 0 years, 0.5 at 5 years, ~0.2 at 10 years
         return np.exp(-year_diff / 5.0)
-
-    def _compute_bibliographic_coupling(self, paper1, paper2) -> float:
-        """
-        Compute bibliographic coupling: how many references they share.
-        This is what ConnectedPapers uses alongside co-citation.
-        """
-        if not paper1.references or not paper2.references:
-            return 0.0
-
-        refs1 = {ref.id for ref in paper1.references}
-        refs2 = {ref.id for ref in paper2.references}
-
-        shared = len(refs1 & refs2)
-        total = len(refs1 | refs2)
-
-        return shared / total if total > 0 else 0.0
 
     def _get_citation_score(self, paper) -> float:
         """
@@ -111,9 +92,6 @@ class RelevanceScorer:
     ) -> Optional[RelevanceScore]:
         return RelevanceScore(
             semantic_similarity=self._compute_semantic_similarity(
-                root_paper, target_paper
-            ),
-            bibliographic_coupling=self._compute_bibliographic_coupling(
                 root_paper, target_paper
             ),
             year_similarity=self._compute_year_similarity(
