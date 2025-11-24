@@ -156,6 +156,31 @@ class RelevanceScorer:
 
         visited: Set[str] = set()
         scored: Set[str] = set()
+        
+        # First, count total unique papers to score for progress tracking
+        # We need to count exactly the same way we'll score
+        papers_to_score = set()
+        temp_visited = set()
+        
+        def count_papers(paper: ResearchPaper):
+            """Count papers that will actually be scored (matching the scoring logic)."""
+            if paper.id in temp_visited:
+                return
+            temp_visited.add(paper.id)
+            adjacent_papers = paper.references + paper.citations
+            for adj in adjacent_papers:
+                if adj.id != root_paper.id:  # Don't score root against itself
+                    papers_to_score.add(adj.id)
+                count_papers(adj)
+        
+        count_papers(root_paper)
+        total_count = len(papers_to_score)
+        
+        if total_count > 0:
+            print(f"  Total papers to score: {total_count}")
+        
+        # Track progress
+        current_count = [0]  # Use list to allow modification in nested function
 
         def dfs(paper: ResearchPaper):
             if paper.id in visited:
@@ -167,7 +192,11 @@ class RelevanceScorer:
                 return
 
             for adj in adjacent_papers:
-                if adj.id not in scored:
+                if adj.id not in scored and adj.id != root_paper.id:
+                    current_count[0] += 1
+                    if total_count > 0:
+                        title_preview = adj.title[:50] + "..." if len(adj.title) > 50 else adj.title
+                        print(f"  [{current_count[0]}/{total_count}] {title_preview}", end="\r", flush=True)
                     score = self.compute_score(root_paper, adj)
                     if score:
                         # Determine edge type
@@ -187,6 +216,8 @@ class RelevanceScorer:
                 dfs(adj)
 
         dfs(root_paper)
+        if total_count > 0:
+            print(f"\n  ✓ Completed scoring {len(edges)} papers")  # Show actual count scored
         return edges
 
 

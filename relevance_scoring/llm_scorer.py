@@ -129,6 +129,7 @@ PAPER 2:
         prompt = self._create_prompt(root_paper, target_paper)
         
         try:
+            # Make API call (this may take a few seconds)
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -151,7 +152,7 @@ PAPER 2:
             }
         
         except Exception as e:
-            print(f"Warning: LLM scoring failed: {e}. Using fallback score.")
+            print(f"\nWarning: LLM scoring failed: {e}. Using fallback score.")
             return {
                 "relevance_score": 0.5,
                 "explanation": f"LLM scoring failed: {str(e)}"
