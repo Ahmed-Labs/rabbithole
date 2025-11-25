@@ -28,123 +28,121 @@ def test_generic_embedding(model_name: str):
         "PHYS": "Quantum entanglement and non-locality in quantum mechanical systems"
     }
     
-    # Generate embeddings
-    embeddings = {}
-    for name, text in papers.items():
-        embeddings[name] = model.encode(text)
+    embeddings = {name: model.encode(text, convert_to_numpy=True) 
+                  for name, text in papers.items()}
     
-    # Compute similarities
-    print("Similarity Matrix:")
-    print(f"{'':>6}", end="")
-    for name in papers.keys():
-        print(f"{name:>8}", end="")
-    print()
+    # Compare ML1 with others
+    print("Similarity to ML1 (CNN image classification):\n")
+    ml1_emb = embeddings["ML1"].reshape(1, -1)
     
-    for name1 in papers.keys():
-        print(f"{name1:>6}", end="")
-        for name2 in papers.keys():
-            sim = cosine_similarity(
-                embeddings[name1].reshape(1, -1),
-                embeddings[name2].reshape(1, -1)
-            )[0][0]
-            print(f"{sim:>8.3f}", end="")
-        print()
+    comparisons = []
+    for name, emb in embeddings.items():
+        if name == "ML1":
+            continue
+        similarity = float(cosine_similarity(ml1_emb, emb.reshape(1, -1))[0][0])
+        comparisons.append((name, similarity))
     
-    # Expected: ML1 and ML2 should be most similar
-    ml1_ml2_sim = cosine_similarity(
-        embeddings["ML1"].reshape(1, -1),
-        embeddings["ML2"].reshape(1, -1)
-    )[0][0]
+    comparisons.sort(key=lambda x: x[1], reverse=True)
     
-    ml1_bio_sim = cosine_similarity(
-        embeddings["ML1"].reshape(1, -1),
-        embeddings["BIO"].reshape(1, -1)
-    )[0][0]
+    for name, sim in comparisons:
+        paper_type = "✓ Related" if name.startswith("ML") else "✗ Unrelated"
+        print(f"{name:6} ({paper_type:12}): {sim:.4f} - {papers[name][:60]}...")
     
-    print(f"\nKey Comparison:")
-    print(f"  ML1 vs ML2 (both about CNNs): {ml1_ml2_sim:.3f}")
-    print(f"  ML1 vs BIO (unrelated): {ml1_bio_sim:.3f}")
-    print(f"  Difference: {ml1_ml2_sim - ml1_bio_sim:.3f}")
-    print(f"  {'✓ Good separation' if ml1_ml2_sim > ml1_bio_sim else '✗ Poor separation'}")
+    # Check if ranking is correct
+    ml_scores = [s for n, s in comparisons if n.startswith("ML")]
+    non_ml_scores = [s for n, s in comparisons if not n.startswith("ML")]
+    
+    if ml_scores and non_ml_scores and min(ml_scores) > max(non_ml_scores):
+        print(f"\n✓ GOOD: Related papers scored higher than unrelated papers")
+    else:
+        print(f"\n⚠ MIXED: Some scoring overlap between related/unrelated papers")
 
 
 def test_specter2():
-    """Test SPECTER2 model (specialized for scientific papers)."""
+    """Test SPECTER2 with proximity adapter."""
     print(f"\n{'='*80}")
-    print("Testing: SPECTER2 (allenai/specter2)")
+    print(f"Testing: SPECTER2 (allenai/specter2_base + proximity adapter)")
     print(f"{'='*80}\n")
     
-    from relevance_scoring.embedder import Embedder
+    # Load model
+    print("Loading SPECTER2...")
+    tokenizer = AutoTokenizer.from_pretrained('allenai/specter2_base')
+    model = AutoAdapterModel.from_pretrained('allenai/specter2_base')
+    model.load_adapter("allenai/specter2", source="hf", set_active=True)
     
-    embedder = Embedder()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    print(f"Model loaded on {device}\n")
     
-    # Test papers (same as above)
+    # Test papers (SPECTER2 format with SEP token)
     papers = {
-        "ML1": "Deep learning methods for image classification using convolutional neural networks",
-        "ML2": "Convolutional neural networks for computer vision tasks and image recognition",
-        "ML3": "Gradient descent optimization algorithms for training deep neural networks",
-        "BIO": "CRISPR gene editing techniques for therapeutic applications in cancer treatment",
-        "PHYS": "Quantum entanglement and non-locality in quantum mechanical systems"
+        "ML1": f"Deep learning methods for image classification using convolutional neural networks",
+        "ML2": f"Convolutional neural networks for computer vision tasks and image recognition",
+        "ML3": f"Gradient descent optimization algorithms for training deep neural networks",
+        "BIO": f"CRISPR gene editing techniques for therapeutic applications in cancer treatment",
+        "PHYS": f"Quantum entanglement and non-locality in quantum mechanical systems"
     }
     
-    # Generate embeddings
+    # Compute embeddings
     embeddings = {}
     for name, text in papers.items():
-        embeddings[name] = embedder.embed(text)
+        inputs = tokenizer(
+            [text],
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=512,
+            return_token_type_ids=False
+        )
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            output = model(**inputs)
+            embedding = output.last_hidden_state[:, 0, :].cpu().numpy()[0]
+            embeddings[name] = embedding
     
-    # Compute similarities
-    print("Similarity Matrix:")
-    print(f"{'':>6}", end="")
-    for name in papers.keys():
-        print(f"{name:>8}", end="")
-    print()
+    # Compare ML1 with others
+    print("Similarity to ML1 (CNN image classification):\n")
+    ml1_emb = embeddings["ML1"].reshape(1, -1)
     
-    for name1 in papers.keys():
-        print(f"{name1:>6}", end="")
-        for name2 in papers.keys():
-            sim = cosine_similarity(
-                embeddings[name1].reshape(1, -1),
-                embeddings[name2].reshape(1, -1)
-            )[0][0]
-            print(f"{sim:>8.3f}", end="")
-        print()
+    comparisons = []
+    for name, emb in embeddings.items():
+        if name == "ML1":
+            continue
+        similarity = float(cosine_similarity(ml1_emb, emb.reshape(1, -1))[0][0])
+        comparisons.append((name, similarity))
     
-    # Expected: ML1 and ML2 should be most similar
-    ml1_ml2_sim = cosine_similarity(
-        embeddings["ML1"].reshape(1, -1),
-        embeddings["ML2"].reshape(1, -1)
-    )[0][0]
+    comparisons.sort(key=lambda x: x[1], reverse=True)
     
-    ml1_bio_sim = cosine_similarity(
-        embeddings["ML1"].reshape(1, -1),
-        embeddings["BIO"].reshape(1, -1)
-    )[0][0]
+    for name, sim in comparisons:
+        paper_type = "✓ Related" if name.startswith("ML") else "✗ Unrelated"
+        print(f"{name:6} ({paper_type:12}): {sim:.4f} - {papers[name][:60]}...")
     
-    print(f"\nKey Comparison:")
-    print(f"  ML1 vs ML2 (both about CNNs): {ml1_ml2_sim:.3f}")
-    print(f"  ML1 vs BIO (unrelated): {ml1_bio_sim:.3f}")
-    print(f"  Difference: {ml1_ml2_sim - ml1_bio_sim:.3f}")
-    print(f"  {'✓ Good separation' if ml1_ml2_sim > ml1_bio_sim else '✗ Poor separation'}")
+    # Check if ranking is correct
+    ml_scores = [s for n, s in comparisons if n.startswith("ML")]
+    non_ml_scores = [s for n, s in comparisons if not n.startswith("ML")]
+    
+    if ml_scores and non_ml_scores and min(ml_scores) > max(non_ml_scores):
+        print(f"\n✓ EXCELLENT: Related papers scored higher than unrelated papers")
+        print(f"  Min ML score: {min(ml_scores):.4f}, Max non-ML score: {max(non_ml_scores):.4f}")
+    else:
+        print(f"\n⚠ MIXED: Some scoring overlap between related/unrelated papers")
 
 
 if __name__ == "__main__":
-    print("=" * 80)
-    print("Embedding Model Comparison")
-    print("=" * 80)
-    print("\nThis script compares generic embeddings vs SPECTER2 for scientific papers.")
-    print("SPECTER2 should show better separation between related and unrelated papers.\n")
+    print("Comparing embedding models for scientific paper similarity")
+    print("This helps validate SPECTER2 performs better than generic models\n")
     
     # Test generic model
     test_generic_embedding("all-MiniLM-L6-v2")
     
     # Test SPECTER2
+    print("\n" + "="*80)
+    input("Press Enter to test SPECTER2 (will download ~450MB model if not cached)...")
     test_specter2()
     
-    print("\n" + "=" * 80)
-    print("Comparison Complete")
-    print("=" * 80)
-    print("\nSPECTER2 should show:")
-    print("  - Higher similarity between related papers (ML1 vs ML2)")
-    print("  - Lower similarity between unrelated papers (ML1 vs BIO)")
-    print("  - Better overall separation for scientific content")
-
+    print("\n" + "="*80)
+    print("CONCLUSION:")
+    print("SPECTER2 should show clearer separation between related and unrelated papers")
+    print("This is because it's trained on citation graphs from 6M+ scientific papers")
+    print("="*80)

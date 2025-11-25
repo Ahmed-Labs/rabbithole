@@ -87,7 +87,7 @@ def build_graph_with_scores(
                 semantic = score.semantic_similarity
                 year_sim = score.year_similarity
                 citation_score = score.citation_score
-                llm_score = score.llm_semantic_score
+                llm_score = score.llm_score
                 llm_explanation = score.llm_explanation
 
             color = get_color_by_score(relevance)
@@ -234,8 +234,8 @@ def print_top_papers(
         print(f"      ├─ Semantic: {score.semantic_similarity:.4f}")
         print(f"      ├─ Year Similarity: {score.year_similarity:.4f}")
         print(f"      ├─ Citation Score: {score.citation_score:.4f}")
-        if score.llm_semantic_score is not None:
-            print(f"      ├─ LLM Score: {score.llm_semantic_score:.4f}")
+        if score.llm_score is not None:
+            print(f"      ├─ LLM Score: {score.llm_score:.4f}")
         print(f"      └─ (Year: {year}, Citations: {citations})")
         if edge.llm_explanation:
             print(f"\n      💡 LLM Explanation: {edge.llm_explanation}")
@@ -385,7 +385,7 @@ if __name__ == "__main__":
                     "semantic_similarity": score.semantic_similarity,
                     "year_similarity": score.year_similarity,
                     "citation_score": score.citation_score,
-                    "llm_relevance_score": score.llm_semantic_score if score.llm_semantic_score is not None else "",
+                    "llm_relevance_score": score.llm_score if score.llm_score is not None else "",
                     "llm_explanation": edge.llm_explanation if edge.llm_explanation else "",
                     "combined": score.combined,
                 }

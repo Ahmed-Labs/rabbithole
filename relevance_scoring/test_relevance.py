@@ -29,71 +29,79 @@ def create_mock_papers():
         url="http://example.com/c",
         title="Image Preprocessing Techniques for Better Recognition",
         authors=[{"name": "Bob Johnson"}],
-        abstract="We explore various image preprocessing methods that improve recognition accuracy in computer vision systems."
+        abstract="This work explores various image preprocessing techniques including normalization and augmentation for improved recognition accuracy."
     )
     
-    # Paper D - unrelated (biology)
+    # Paper D - less related (general optimization)
     paper_d = ResearchPaper(
         id="D",
         url="http://example.com/d",
-        title="CRISPR Gene Editing in Cancer Treatment",
-        authors=[{"name": "Alice Williams"}],
-        abstract="This study investigates the use of CRISPR technology for targeted cancer therapy and gene modification."
+        title="Optimization Algorithms in Machine Learning",
+        authors=[{"name": "Alice Brown"}],
+        abstract="An overview of gradient descent and other optimization algorithms used in training machine learning models."
     )
     
-    # Set up references (A references B and C)
-    paper_a.references = [paper_b, paper_c]
-    paper_b.references = []
-    paper_c.references = []
-    paper_d.references = []
+    # Set up reference structure
+    # A → B → C
+    # A → D
+    paper_a.references = [paper_b, paper_d]
+    paper_b.references = [paper_c]
     
-    return paper_a, paper_b, paper_c, paper_d
+    return paper_a
 
 
-def test_relevance_scoring():
-    """Test the relevance scoring system with mock papers."""
-    print("=" * 80)
-    print("Testing Relevance Scoring System")
-    print("=" * 80)
+def test_basic_similarity():
+    """Test basic semantic similarity between two papers."""
+    print("="*80)
+    print("TEST 1: Basic Semantic Similarity")
+    print("="*80)
     
-    # Create mock papers
-    root, paper_b, paper_c, paper_d = create_mock_papers()
+    scorer = RelevanceScorer()
     
-    # Initialize scorer (without LLM for testing)
-    scorer = RelevanceScorer(llm_scorer=None)
+    paper_a = create_mock_papers()
+    paper_b = paper_a.references[0]  # CNNs paper
+    paper_d = paper_a.references[1]  # Optimization paper
     
-    # Test scoring
-    print(f"\nRoot Paper: {root.title}")
-    print(f"Abstract: {root.abstract[:60]}...")
-    print("\n" + "-" * 80)
+    sim_ab = scorer.compute_score(paper_a, paper_b).combined
+    sim_ad = scorer.compute_score(paper_a, paper_d).combined
     
-    test_papers = [
-        ("Paper B (Related - Neural Networks)", paper_b),
-        ("Paper C (Somewhat Related - Image Processing)", paper_c),
-        ("Paper D (Unrelated - Biology)", paper_d),
-    ]
+    print(f"\nPaper A: {paper_a.title}")
+    print(f"Paper B: {paper_b.title}")
+    print(f"Similarity A↔B: {sim_ab:.4f}")
+    print(f"\nPaper D: {paper_d.title}")
+    print(f"Similarity A↔D: {sim_ad:.4f}")
+    print(f"\nExpected: B should be more similar to A than D")
+    print(f"Result: {'✓ PASS' if sim_ab > sim_ad else '✗ FAIL'}")
+
+def test_relevance_ranking():
+    """Test that papers are ranked by combined relevance score."""
+    print("\n" + "="*80)
+    print("TEST 2: Relevance Ranking")
+    print("="*80)
     
-    for name, paper in test_papers:
-        print(f"\n{name}:")
-        print(f"  Title: {paper.title}")
-        print(f"  Abstract: {paper.abstract[:60]}...")
-        
-        score = scorer.compute_score(root, paper)
-        if score:
-            print(f"\n  Relevance Score Breakdown:")
-            print(f"    Combined: {score.combined:.4f}")
-            print(f"    Semantic Similarity: {score.semantic_similarity:.4f}")
-            print(f"    Bibliographic Coupling: {score.bibliographic_coupling:.4f}")
-            print(f"    Year Similarity: {score.year_similarity:.4f}")
-            print(f"    Citation Score: {score.citation_score:.4f}")
-        else:
-            print("  Could not compute score")
+    scorer = RelevanceScorer()
+    paper_a = create_mock_papers()
     
-    print("\n" + "=" * 80)
-    print("Test Complete")
-    print("=" * 80)
+    results = scorer.compute_relevance_edges(paper_a)
+    results.sort(key=lambda x: x.relevance_score.combined, reverse=True)
+    
+    print(f"\nPapers ranked by relevance to root paper:\n")
+    for i, edge in enumerate(results, 1):
+        print(f"{i}. ID: {edge.dest_id}")
+        print(f"   Score: {edge.relevance_score.combined}")
+        print(f"   Semantic Similarity: {edge.relevance_score.semantic_similarity}")
+    
+    print("\nExpected: Paper B (direct ref, high similarity) should rank highest")
+    print(f"Result: {'✓ PASS' if results[0].dest_id == 'B' else '✗ FAIL'}")
 
 
 if __name__ == "__main__":
-    test_relevance_scoring()
-
+    print("\nRunning Relevance Scoring Tests\n")
+    
+    test_basic_similarity()
+    test_relevance_ranking()
+    
+    print("\n" + "="*80)
+    print("All tests completed!")
+    print("="*80)
+    

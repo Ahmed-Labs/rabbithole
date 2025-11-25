@@ -12,21 +12,16 @@ class RelevanceScore:
     year_similarity: float
     citation_score: float
     llm_explanation: Optional[str] = None  # Optional explanation from LLM
-    llm_semantic_score: Optional[float] = None  # Optional LLM-based semantic score
+    llm_score: Optional[float] = None  # Optional LLM-based semantic score
 
     @property
     def combined(self):
         # Use LLM semantic score if available, otherwise use embedding-based
-        semantic = self.llm_semantic_score if self.llm_semantic_score is not None else self.semantic_similarity
-        return (
-            0.75 * self.semantic_similarity
-            + 0.15 * self.year_similarity
-            + 0.10 * self.citation_score
-        )
+        existing_score =  0.75 * self.semantic_similarity + 0.15 * self.year_similarity + 0.10 * self.citation_score
         
         # Combine with LLM score if available: 0.5 * existing + 0.5 * LLM
-        if self.llm_semantic_score is not None:
-            return 0.5 * existing_score + 0.5 * self.llm_semantic_score
+        if self.llm_score is not None:
+            return 0.5 * existing_score + 0.5 * self.llm_score
         else:
             return existing_score
 
@@ -116,7 +111,6 @@ class RelevanceScorer:
     ) -> Optional[RelevanceScore]:
         # Compute base scores (SPECTER2-based)
         semantic_sim = self._compute_semantic_similarity(root_paper, target_paper)
-        bib_coupling = self._compute_bibliographic_coupling(root_paper, target_paper)
         year_sim = self._compute_year_similarity(root_paper.year, target_paper.year)
         citation_score = self._get_citation_score(target_paper)
         
@@ -134,7 +128,7 @@ class RelevanceScorer:
                 print(f"Warning: LLM scoring failed: {e}")
         
         return RelevanceScore(
-            llm_semantic_score=llm_score,
+            llm_score=llm_score,
             llm_explanation=llm_explanation,
             semantic_similarity=self._compute_semantic_similarity(
                 root_paper, target_paper
@@ -246,7 +240,6 @@ def compute_relevance_scores(
         - title: str
         - relevance_score: float
         - semantic_similarity: float
-        - bibliographic_coupling: float
         - year_similarity: float
         - citation_score: float
         - llm_explanation: Optional[str]
@@ -306,11 +299,10 @@ def compute_relevance_scores(
             "title": target_paper.title if target_paper else "Unknown",
             "relevance_score": edge.relevance_score.combined,
             "semantic_similarity": edge.relevance_score.semantic_similarity,
-            "bibliographic_coupling": edge.relevance_score.bibliographic_coupling,
             "year_similarity": edge.relevance_score.year_similarity,
             "citation_score": edge.relevance_score.citation_score,
             "llm_explanation": edge.llm_explanation,  # Get from edge, not score
-            "llm_relevance_score": edge.relevance_score.llm_semantic_score,
+            "llm_relevance_score": edge.relevance_score.llm_score,
             "edge_type": edge.edge_type,
             "depth": edge.depth,
             "path_probability": 1.0,  # Placeholder
