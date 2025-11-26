@@ -11,9 +11,11 @@ from relevance_scoring.relevance_scorer import (
     RelevanceScore,
 )
 
+
 def wrap_text(text: str, width: int = 80) -> str:
     """Wrap LLM explanation to avoid overflow in hover tooltip."""
     return "\n".join(textwrap.wrap(text, width))
+
 
 def index_papers(root: ResearchPaper) -> Dict[str, ResearchPaper]:
     """Build a mapping from paper id → ResearchPaper by traversing the graph."""
@@ -54,136 +56,135 @@ def build_graph_with_scores(
         if score >= 0.8:
             return "#22c55e"  # Green
         if score >= 0.7:
-            return "#6ec522"  # Green
+            return "#6ec522"  # Green-ish
         if score >= 0.6:
-            return "#c5c522"  # Green
+            return "#c5c522"  # Yellow-green
         if score >= 0.5:
-            return "#c59c22"  # Green
+            return "#c59c22"  # Yellow-orange
         elif score >= 0.4:
-            return "#ea8808"  # Yellow
+            return "#ea8808"  # Orange
         elif score >= 0.3:
-            return "#f97316"  # Orange
+            return "#f97316"  # Deep orange
         else:
             return "#ef4444"  # Red
 
     seen_nodes: set[str] = set()
     added_edges: set[tuple[str, str, str]] = set()
 
-    def add_paper(paper: ResearchPaper, depth: int = 0):
-        if paper.id in seen_nodes:
-            return
-        seen_nodes.add(paper.id)
+    def add_paper(paper: ResearchPaper, depth: int = 0) -> bool:
+        """
+        Add a paper node to the graph.
 
-        # Root node is blue
+        Returns True if the node was added (or already present), False if it
+        should be skipped (e.g., gray / no LLM score).
+        """
+        if paper.id in seen_nodes:
+            return True
+
+        # Root node is always shown
         if depth == 0:
             color = "#3b82f6"
-            score_info = (
-                f"ROOT\n"
-                f"Year: {paper.year or 'N/A'} | "
-                f"Citations: {paper.citation_count or 0}"
-            )
+            relevance_for_label = 1.0
+            node_label = paper.title[:30]
+            llm_explanation = None
+            pdf_url = getattr(paper, "pdf_url", None)
+
+            # Hover: just link + note that it's the root
+            tooltip_parts = []
+            tooltip_parts.append("Root paper")
+            if pdf_url:
+                tooltip_parts.append(
+                    f'<a href="{pdf_url}" target="_blank">Open PDF</a>'
+                )
+            node_title = "<br><br>".join(tooltip_parts) if tooltip_parts else ""
         else:
             score = scores_map.get(paper.id)
             if score is None:
-                relevance = 0.0
-                semantic = 0.0
-                year_sim = 0.0
-                citation_score = 0.0
-                llm_score = None
-            else:
-                relevance = score.combined
-                semantic = score.semantic_similarity
-                year_sim = score.year_similarity
-                citation_score = score.citation_score
-                llm_score = score.llm_score
+                # No score at all → skip
+                return False
 
-            # Color logic:
-            # - if no LLM score → grey
-            # - if LLM score exists → use normal color map (based on combined score)
+            relevance = score.combined
+            llm_score = score.llm_score
+
+            # Hide any "gray" ones: if no LLM score, we don't display this node
             if llm_score is None:
-                color = "#9ca3af"  # gray
-            else:
-                color = get_color_by_score(relevance)
+                return False
 
-            score_info = (
-                f"Relevance: {relevance:.3f}\n"
-                f"Semantic: {semantic:.3f} | "
-                f"YearSim: {year_sim:.3f} | "
-                f"CitationScore: {citation_score:.3f}"
-            )
+            # Color and size based purely on final relevance score
+            color = get_color_by_score(relevance)
 
-            if llm_score is not None:
-                score_info += f" | LLM: {llm_score:.3f}"
+            # Node label: short title, keep relevance in label so you can see it at a glance
+            node_label = f"{paper.title[:30]}"
+            relevance_for_label = relevance
 
-            score_info += (
-                f"\nYear: {paper.year or 'N/A'} | "
-                f"Citations: {paper.citation_count or 0}"
-            )
-
+            # Hover content: ONLY final relevance, LLM explanation, and PDF link
             llm_explanation = llm_map.get(paper.id)
+            pdf_url = getattr(paper, "pdf_url", None)
+
+            tooltip_parts = [paper.title + " | " + f"Relevance score: {relevance:.3f}"]
+
+            if pdf_url:
+                tooltip_parts.append(
+                    f'<a href="{pdf_url}" target="_blank">Open PDF</a>'
+                )
+
             if llm_explanation:
-                score_info += f"\n\nRelevance Assessment:\n{wrap_text(llm_explanation)}"
+                wrapped = wrap_text(llm_explanation)
+                wrapped_html = wrapped.replace("\n", "<br>")
+                tooltip_parts.append(wrapped_html)
 
-        # Add node with score information
+            node_title = "<br><br>".join(tooltip_parts)
+
+        # Size: larger nodes for higher relevance (root is maxed)
         if depth == 0:
-            node_label = paper.title[:30]
+            value = 60
         else:
-            relevance_for_label = (
-                scores_map.get(paper.id).combined if paper.id in scores_map else 0.0
-            )
-            node_label = (
-                f"{paper.title[:30]}\n"
-                f"Rel: {relevance_for_label:.3f}"
-            )
-
-        node_title = f"{paper.title}\n\n{score_info}"
+            # Map relevance in [0,1] to a reasonable size range [10, 60]
+            value = max(10, min(60, int(relevance_for_label * 50) + 10))
 
         net.add_node(
             paper.id,
             label=node_label,
             title=node_title,
             color=color,
+            value=value,
         )
+        seen_nodes.add(paper.id)
+        return True
 
     def add_edges(paper: ResearchPaper, depth: int = 0):
-        """Add edges for both references and citations."""
+        """Add edges for both references and citations, only between visible nodes."""
         # References: paper → ref
         for ref in paper.references:
-            if ref.id not in seen_nodes:
-                add_paper(ref, depth + 1)
-
-            key = (paper.id, ref.id, "reference")
-            if key not in added_edges:
-                net.add_edge(
-                    paper.id,
-                    ref.id,
-                    dashes=False,  # Solid line
-                    color="#666666",
-                    arrows="to",
-                )
-                added_edges.add(key)
-
-            # Recursively add edges for referenced papers
-            add_edges(ref, depth + 1)
+            # Only add edge + recurse if the referenced paper is visible
+            if add_paper(ref, depth + 1):
+                key = (paper.id, ref.id, "reference")
+                if key not in added_edges:
+                    net.add_edge(
+                        paper.id,
+                        ref.id,
+                        dashes=False,  # Solid line
+                        color="#666666",
+                        arrows="to",
+                    )
+                    added_edges.add(key)
+                add_edges(ref, depth + 1)
 
         # Citations: cit → paper
         for cit in paper.citations:
-            if cit.id not in seen_nodes:
-                add_paper(cit, depth + 1)
-
-            key = (cit.id, paper.id, "citation")
-            if key not in added_edges:
-                net.add_edge(
-                    cit.id,
-                    paper.id,
-                    dashes=[5, 5],  # Dashed line pattern
-                    color="#9333ea",  # Purple for citations
-                    arrows="to",
-                )
-                added_edges.add(key)
-
-            # Recursively add edges for citing papers
-            add_edges(cit, depth + 1)
+            # Only add edge + recurse if the citing paper is visible
+            if add_paper(cit, depth + 1):
+                key = (cit.id, paper.id, "citation")
+                if key not in added_edges:
+                    net.add_edge(
+                        cit.id,
+                        paper.id,
+                        dashes=False,  # Dashed line pattern
+                        color="#666666",  # Purple for citations
+                        arrows="to",
+                    )
+                    added_edges.add(key)
+                add_edges(cit, depth + 1)
 
     # Start with root paper
     add_paper(root, 0)
@@ -203,9 +204,7 @@ def print_top_papers(
     print(f"{'=' * 100}\n")
 
     # Sort by combined score (descending)
-    sorted_edges = sorted(
-        edges, key=lambda e: e.relevance_score.combined, reverse=True
-    )
+    sorted_edges = sorted(edges, key=lambda e: e.relevance_score.combined, reverse=True)
 
     for i, edge in enumerate(sorted_edges[:top_n], 1):
         paper = paper_index.get(edge.dest_id)
@@ -235,13 +234,11 @@ def print_stats(edges: List[RelevanceEdge]):
 
     print(f"Total papers scored: {len(edges)}")
 
-    avg_semantic = (
-        sum(e.relevance_score.semantic_similarity for e in edges) / len(edges)
+    avg_semantic = sum(e.relevance_score.semantic_similarity for e in edges) / len(
+        edges
     )
     avg_year = sum(e.relevance_score.year_similarity for e in edges) / len(edges)
-    avg_citation = (
-        sum(e.relevance_score.citation_score for e in edges) / len(edges)
-    )
+    avg_citation = sum(e.relevance_score.citation_score for e in edges) / len(edges)
     avg_combined = sum(e.relevance_score.combined for e in edges) / len(edges)
 
     print(f"\nAverage semantic similarity: {avg_semantic:.4f}")
@@ -252,7 +249,7 @@ def print_stats(edges: List[RelevanceEdge]):
 
 
 if __name__ == "__main__":
-    query = "phasor"
+    query = input("Enter search query: ").strip()
     papers = search(query)
 
     if not papers:
@@ -266,27 +263,23 @@ if __name__ == "__main__":
     print(f"Citations: {root_paper.citation_count or 0}")
     print("=" * 100)
 
-    # Configuration
-    depth = 3  # How many levels deep to traverse (both references and citations)
-    max_per_level = 20  # Max papers per level (both references and citations)
-    include_citations = True  # Whether to include citation edges
+    depth = int(input("Enter search depth: ").strip() or 3)
+    max_per_level = int(input("Enter max papers per level (e.g., 20): ").strip() or 20)
 
     print(f"\nBuilding paper graph:")
     print(f"  Depth: {depth} levels")
     print(f"  Max per level: {max_per_level} papers")
-    print(f"  Include citations: {include_citations}")
 
     root_paper = build_full_graph(
         root_paper,
         depth=depth,
         max_per_level=max_per_level,
-        include_citations=include_citations,
     )
 
     print("\nComputing relevance scores...")
     edges = compute_relevance_scores(root_paper)
 
-    # Build paper index for easy lookup by id (for printing + CSV)
+    # Build paper index for easy lookup by id (for printing)
     paper_index = index_papers(root_paper)
 
     # Create lookup map for visualization
@@ -297,7 +290,7 @@ if __name__ == "__main__":
         edge.dest_id: edge.llm_explanation for edge in edges
     }
 
-    # Print statistics and top papers
+    # Print statistics and top papers (CLI only, doesn't affect graph)
     print_stats(edges)
     print_top_papers(edges, paper_index, top_n=15)
 
@@ -312,50 +305,9 @@ if __name__ == "__main__":
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
 
-    output_file = output_dir / "references_graph.html"
+    output_file = output_dir / "knowledge_graph.html"
     net.write_html(str(output_file))
     print(f"✓ Graph saved to: {output_file}")
-
-    # Save scores to CSV
-    import csv
-
-    csv_file = output_dir / "relevance_scores.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        fieldnames = [
-            "src_id",
-            "dest_id",
-            "paper_id",
-            "title",
-            "year",
-            "citation_count",
-            "semantic_similarity",
-            "year_similarity",
-            "citation_score",
-            "combined",
-        ]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for edge in edges:
-            paper = paper_index.get(edge.dest_id)
-            score = edge.relevance_score
-
-            writer.writerow(
-                {
-                    "src_id": edge.src_id,
-                    "dest_id": edge.dest_id,
-                    "paper_id": edge.dest_id,
-                    "title": paper.title if paper else "",
-                    "year": paper.year if paper else "",
-                    "citation_count": paper.citation_count if paper else "",
-                    "semantic_similarity": score.semantic_similarity,
-                    "year_similarity": score.year_similarity,
-                    "citation_score": score.citation_score,
-                    "combined": score.combined,
-                }
-            )
-
-    print(f"✓ Scores saved to: {csv_file}")
 
     print(f"\n{'=' * 100}")
     print("Done! Open the HTML file in your browser to explore the graph.")

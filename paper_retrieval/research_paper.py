@@ -20,8 +20,6 @@ class ResearchPaper:
     references: List["ResearchPaper"] = field(default_factory=list)
     # Papers that cite this paper
     citations: List["ResearchPaper"] = field(default_factory=list)
-    # LLM relevance score (computed when comparing with another paper)
-    llm_relevance_score: Optional[float] = None
 
     # Internal caches for full text
     _full_text_cache: Optional[str] = field(

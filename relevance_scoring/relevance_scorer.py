@@ -4,26 +4,31 @@ import numpy as np
 
 from relevance_scoring.embedder import Embedder
 from paper_retrieval import ResearchPaper
+from relevance_scoring.llm_scorer import LLMScorer
 
+# LLM scores and explanations will only be generated for papers
+# with a relevance score above this threshold.
+LLM_SCORING_THRESHOLD = 0.8
 
 @dataclass
 class RelevanceScore:
     semantic_similarity: float
     year_similarity: float
     citation_score: float
-    llm_explanation: Optional[str] = None  # Optional explanation from LLM
-    llm_score: Optional[float] = None  # Optional LLM-based semantic score
+    llm_score: Optional[float] = None
 
     @property
     def combined(self):
-        # Use LLM semantic score if available, otherwise use embedding-based
-        existing_score =  0.75 * self.semantic_similarity + 0.15 * self.year_similarity + 0.10 * self.citation_score
-        
-        # Combine with LLM score if available: 0.5 * existing + 0.5 * LLM
+        existing_score = (
+            0.75 * self.semantic_similarity
+            + 0.15 * self.year_similarity
+            + 0.10 * self.citation_score
+        )
+
         if self.llm_score is not None:
             return 0.5 * existing_score + 0.5 * self.llm_score
-        else:
-            return existing_score
+
+        return existing_score
 
 
 @dataclass
@@ -31,9 +36,7 @@ class RelevanceEdge:
     src_id: str
     dest_id: str
     relevance_score: RelevanceScore
-    edge_type: str = "reference"  # "reference" or "citation"
-    depth: int = 1
-    llm_explanation: Optional[str] = None  # LLM explanation for this edge
+    llm_explanation: Optional[str] = None
 
 
 class RelevanceScorer:
@@ -41,24 +44,15 @@ class RelevanceScorer:
     Compute semantic relevance scores between papers.
 
     Relevance scores consist of:
-    - Semantic similarity (SPECTER2 embeddings or LLM-based)
-    - Co-citation analysis (papers cited together)
+    - Semantic similarity
     - Publication year proximity
     - Citation score
-    - LLM relevance score (optional, combined with existing score)
-    
-    Uses LLM for additional scoring and explanations when provided.
+    - LLM relevance score
     """
 
-    def __init__(self, llm_scorer=None):
-        """
-        Initialize relevance scorer.
-        
-        Args:
-            llm_scorer: Optional LLMScorer instance for LLM-based scoring
-        """
+    def __init__(self):
         self.embedder = Embedder()
-        self.llm_scorer = llm_scorer
+        self.llm_scorer = LLMScorer()
 
     def _compute_year_similarity(
         self, year1: Optional[int], year2: Optional[int]
@@ -108,28 +102,8 @@ class RelevanceScorer:
 
     def compute_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
-    ) -> Optional[RelevanceScore]:
-        # Compute base scores (SPECTER2-based)
-        semantic_sim = self._compute_semantic_similarity(root_paper, target_paper)
-        year_sim = self._compute_year_similarity(root_paper.year, target_paper.year)
-        citation_score = self._get_citation_score(target_paper)
-        
-        # Compute LLM score if available
-        llm_score = None
-        llm_explanation = None
-        if self.llm_scorer:
-            try:
-                llm_result = self.llm_scorer.compute_score(root_paper, target_paper)
-                llm_score = llm_result.get("relevance_score")
-                llm_explanation = llm_result.get("explanation")
-                # Store LLM score in target paper
-                target_paper.llm_relevance_score = llm_score
-            except Exception as e:
-                print(f"Warning: LLM scoring failed: {e}")
-        
-        return RelevanceScore(
-            llm_score=llm_score,
-            llm_explanation=llm_explanation,
+    ) -> tuple[Optional[RelevanceScore], Optional[str]]:
+        relevance_score = RelevanceScore(
             semantic_similarity=self._compute_semantic_similarity(
                 root_paper, target_paper
             ),
@@ -138,6 +112,15 @@ class RelevanceScorer:
             ),
             citation_score=self._get_citation_score(target_paper),
         )
+
+        if relevance_score.combined >= LLM_SCORING_THRESHOLD:
+            llm_score, llm_description = self.llm_scorer.compute_score(
+                root_paper, target_paper
+            )
+            relevance_score.llm_score = llm_score
+            return relevance_score, llm_description
+
+        return relevance_score, None
 
     def compute_relevance_edges(
         self,
@@ -150,31 +133,6 @@ class RelevanceScorer:
 
         visited: Set[str] = set()
         scored: Set[str] = set()
-        
-        # First, count total unique papers to score for progress tracking
-        # We need to count exactly the same way we'll score
-        papers_to_score = set()
-        temp_visited = set()
-        
-        def count_papers(paper: ResearchPaper):
-            """Count papers that will actually be scored (matching the scoring logic)."""
-            if paper.id in temp_visited:
-                return
-            temp_visited.add(paper.id)
-            adjacent_papers = paper.references + paper.citations
-            for adj in adjacent_papers:
-                if adj.id != root_paper.id:  # Don't score root against itself
-                    papers_to_score.add(adj.id)
-                count_papers(adj)
-        
-        count_papers(root_paper)
-        total_count = len(papers_to_score)
-        
-        if total_count > 0:
-            print(f"  Total papers to score: {total_count}")
-        
-        # Track progress
-        current_count = [0]  # Use list to allow modification in nested function
 
         def dfs(paper: ResearchPaper):
             if paper.id in visited:
@@ -182,27 +140,17 @@ class RelevanceScorer:
             visited.add(paper.id)
 
             adjacent_papers = paper.references + paper.citations
-            if not adjacent_papers:
-                return
 
             for adj in adjacent_papers:
-                if adj.id not in scored and adj.id != root_paper.id:
-                    current_count[0] += 1
-                    if total_count > 0:
-                        title_preview = adj.title[:50] + "..." if len(adj.title) > 50 else adj.title
-                        print(f"  [{current_count[0]}/{total_count}] {title_preview}", end="\r", flush=True)
-                    score = self.compute_score(root_paper, adj)
+                if adj.id not in scored:
+                    score, llm_description = self.compute_score(root_paper, adj)
                     if score:
-                        # Determine edge type
-                        edge_type = "reference" if adj in paper.references else "citation"
-                        
                         edges.append(
                             RelevanceEdge(
                                 src_id=root_paper.id,
                                 dest_id=adj.id,
                                 relevance_score=score,
-                                edge_type=edge_type,
-                                llm_explanation=score.llm_explanation,
+                                llm_explanation=llm_description
                             )
                         )
                     scored.add(adj.id)
@@ -210,103 +158,15 @@ class RelevanceScorer:
                 dfs(adj)
 
         dfs(root_paper)
-        if total_count > 0:
-            print(f"\n  ✓ Completed scoring {len(edges)} papers")  # Show actual count scored
         return edges
 
 
-def compute_relevance_scores(
-    root_paper,
-    use_llm: bool = True,  # Default to True - LLM scoring is now automatic
-    llm_scorer=None,
-    max_depth: Optional[int] = None,
-    use_cache: bool = True
-) -> Tuple[List[dict], RelevanceScorer]:
-    """
-    Compute relevance scores for all papers in the graph.
-    
-    LLM scoring is automatically enabled. Set use_llm=False to disable.
-    
-    Args:
-        root_paper: The root paper to score against
-        use_llm: Whether to use LLM for semantic scoring (default: True)
-        llm_scorer: Optional LLMScorer instance (created automatically if None and use_llm=True)
-        max_depth: Optional max depth (currently unused, kept for compatibility)
-        use_cache: Whether to use embedding cache (currently unused, kept for compatibility)
-    
-    Returns:
-        Tuple of (results_list, scorer) where results_list is a list of dicts with:
-        - paper_id: str
-        - title: str
-        - relevance_score: float
-        - semantic_similarity: float
-        - year_similarity: float
-        - citation_score: float
-        - llm_explanation: Optional[str]
-        - edge_type: str ("reference" or "citation")
-        - depth: int
-        - path_probability: float (placeholder, currently 1.0)
-    """
-    # Initialize LLM scorer automatically (unless explicitly disabled)
-    if use_llm and llm_scorer is None:
-        try:
-            from relevance_scoring.llm_scorer import LLMScorer
-            llm_scorer = LLMScorer(use_explanations=True)
-            print("✓ LLM scorer initialized (GPT-5-nano)")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not initialize LLM scorer: {e}")
-            print("   Continuing without LLM scoring...")
-            llm_scorer = None
-            use_llm = False
-    
-    scorer = RelevanceScorer(llm_scorer=llm_scorer)
+def compute_relevance_scores(root_paper) -> Tuple[List[RelevanceEdge]]:
+    scorer = RelevanceScorer()
 
     print("\nComputing relevance scores...")
-    if use_llm:
-        print("Using LLM (GPT-5-nano) for semantic scoring and explanations...")
-    else:
-        print("Using SPECTER2 embeddings only (LLM disabled)...")
     edges = scorer.compute_relevance_edges(root_paper)
 
     edges.sort(key=lambda x: x.relevance_score.combined, reverse=True)
 
-    # Convert edges to dictionary format expected by visualization
-    results = []
-    paper_map = {}  # Map paper IDs to paper objects for title lookup
-    
-    def collect_papers(paper, depth=0):
-        """Recursively collect all papers in the graph."""
-        if paper.id not in paper_map:
-            paper_map[paper.id] = paper
-        for ref in paper.references:
-            if ref.id not in paper_map:
-                paper_map[ref.id] = ref
-                collect_papers(ref, depth + 1)
-        for cit in paper.citations:
-            if cit.id not in paper_map:
-                paper_map[cit.id] = cit
-                collect_papers(cit, depth + 1)
-    
-    collect_papers(root_paper)
-    
-    for edge in edges:
-        target_paper = paper_map.get(edge.dest_id)
-        if not target_paper:
-            continue
-        
-        result = {
-            "paper_id": edge.dest_id,
-            "title": target_paper.title if target_paper else "Unknown",
-            "relevance_score": edge.relevance_score.combined,
-            "semantic_similarity": edge.relevance_score.semantic_similarity,
-            "year_similarity": edge.relevance_score.year_similarity,
-            "citation_score": edge.relevance_score.citation_score,
-            "llm_explanation": edge.llm_explanation,  # Get from edge, not score
-            "llm_relevance_score": edge.relevance_score.llm_score,
-            "edge_type": edge.edge_type,
-            "depth": edge.depth,
-            "path_probability": 1.0,  # Placeholder
-        }
-        results.append(result)
-
-    return results, scorer
+    return edges
