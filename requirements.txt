@@ -10,3 +10,4 @@ transformers>=4.30.0
 adapters>=0.2.0
 redis
 requests-cache
+Flask>=3.0.0

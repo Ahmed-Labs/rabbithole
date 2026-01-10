@@ -1,0 +1,2 @@
+class RelevanceService:
+    pass
