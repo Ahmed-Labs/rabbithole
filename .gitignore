@@ -1,14 +1,10 @@
 venv/
 lib/
+__pycache__/
 paper_retrieval/output/
 experiments/output/
 .embedding_cache/
-.env
-.env.local
-*.env
-
 *.pyc
 __pycache__/
 **/__pycache__/
-*.py[cod]
-*$py.class
+.env
