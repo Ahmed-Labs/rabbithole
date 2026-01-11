@@ -1,2 +1,0 @@
-class PaperService:
-    pass
