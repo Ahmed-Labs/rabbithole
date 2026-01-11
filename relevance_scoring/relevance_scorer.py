@@ -4,21 +4,28 @@ import numpy as np
 
 from relevance_scoring.embedder import Embedder
 from paper_retrieval import ResearchPaper
-
+from relevance_scoring.llm_scorer import LLMScorer
+from relevance_scoring.constants import *
 
 @dataclass
 class RelevanceScore:
     semantic_similarity: float
     year_similarity: float
     citation_score: float
+    llm_score: Optional[float] = None
 
     @property
     def combined(self):
-        return (
+        existing_score = (
             0.75 * self.semantic_similarity
             + 0.15 * self.year_similarity
             + 0.10 * self.citation_score
         )
+
+        if self.llm_score is not None:
+            return 0.5 * existing_score + 0.5 * self.llm_score
+
+        return existing_score
 
 
 @dataclass
@@ -26,6 +33,7 @@ class RelevanceEdge:
     src_id: str
     dest_id: str
     relevance_score: RelevanceScore
+    llm_explanation: Optional[str] = None
 
 
 class RelevanceScorer:
@@ -33,13 +41,15 @@ class RelevanceScorer:
     Compute semantic relevance scores between papers.
 
     Relevance scores consist of:
-    - Semnatic similarity
-    - Co-citation analysis (papers cited together)
+    - Semantic similarity
     - Publication year proximity
+    - Citation score
+    - LLM relevance score
     """
 
     def __init__(self):
         self.embedder = Embedder()
+        self.llm_scorer = LLMScorer()
 
     def _compute_year_similarity(
         self, year1: Optional[int], year2: Optional[int]
@@ -89,8 +99,8 @@ class RelevanceScorer:
 
     def compute_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
-    ) -> Optional[RelevanceScore]:
-        return RelevanceScore(
+    ) -> tuple[Optional[RelevanceScore], Optional[str]]:
+        relevance_score = RelevanceScore(
             semantic_similarity=self._compute_semantic_similarity(
                 root_paper, target_paper
             ),
@@ -99,6 +109,15 @@ class RelevanceScorer:
             ),
             citation_score=self._get_citation_score(target_paper),
         )
+
+        if relevance_score.combined >= LLM_SCORING_THRESHOLD:
+            llm_score, llm_description = self.llm_scorer.compute_score(
+                root_paper, target_paper
+            )
+            relevance_score.llm_score = llm_score
+            return relevance_score, llm_description
+
+        return relevance_score, None
 
     def compute_relevance_edges(
         self,
@@ -118,18 +137,17 @@ class RelevanceScorer:
             visited.add(paper.id)
 
             adjacent_papers = paper.references + paper.citations
-            if not adjacent_papers:
-                return
 
             for adj in adjacent_papers:
                 if adj.id not in scored:
-                    score = self.compute_score(root_paper, adj)
+                    score, llm_description = self.compute_score(root_paper, adj)
                     if score:
                         edges.append(
                             RelevanceEdge(
                                 src_id=root_paper.id,
                                 dest_id=adj.id,
                                 relevance_score=score,
+                                llm_explanation=llm_description
                             )
                         )
                     scored.add(adj.id)

@@ -4,3 +4,7 @@ __pycache__/
 paper_retrieval/output/
 experiments/output/
 .embedding_cache/
+*.pyc
+__pycache__/
+**/__pycache__/
+.env

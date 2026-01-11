@@ -6,7 +6,7 @@ def create_session():
     session = requests_cache.CachedSession(
         backend="redis",
         cache_name="httpcache",
-        expire_after=60 * 60 * 24,
+        expire_after=60 * 60 * 24 * 7,
         allowable_methods=("GET", "POST"),
     )
 
