@@ -5,10 +5,7 @@ import numpy as np
 from relevance_scoring.embedder import Embedder
 from paper_retrieval import ResearchPaper
 from relevance_scoring.llm_scorer import LLMScorer
-
-# LLM scores and explanations will only be generated for papers
-# with a relevance score above this threshold.
-LLM_SCORING_THRESHOLD = 0.8
+from relevance_scoring.constants import *
 
 @dataclass
 class RelevanceScore:
