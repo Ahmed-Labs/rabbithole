@@ -6,7 +6,7 @@ from relevance_scoring.constants import *
 
 
 class LLMScorer:
-    def __init__(self, api_key: Optional[str]):
+    def __init__(self, api_key: Optional[str] = None):
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
         if not resolved_key:
             raise ValueError(
