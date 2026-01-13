@@ -21,3 +21,11 @@ docker compose up -d
 ```bash
 python -m experiments.visualize_relevance_scores
 ```
+
+### Development Tips
+
+### Neo4j
+
+Access the neo4j interactive UI through: http://localhost:7474/
+
+After logging in, you can run Cypher queries like `MATCH p=()-[r:RELEVANT_TO]->() RETURN p`
