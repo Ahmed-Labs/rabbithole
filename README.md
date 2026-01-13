@@ -11,10 +11,10 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Spin up redis container
+### 3. Spin up Redis and Neo4j
 Make sure you have docker running and run the following command:
 ```bash
-docker run -d --name redis -p 6379:6379 redis:7-alpine
+docker compose up -d
 ```
 
 ### 4. Run any module/submodule. Example:
