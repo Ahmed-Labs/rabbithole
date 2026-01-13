@@ -138,7 +138,7 @@ def get_citations_recur(
     return paper
 
 
-def build_full_graph(
+def build_citation_graph(
     root_paper: ResearchPaper,
     depth: int = 1,
     max_per_level: int = 10,
