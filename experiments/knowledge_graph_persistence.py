@@ -1,4 +1,4 @@
-from db import Neo4jClient, Neo4jConfig, PaperGraphWriter
+from db import Neo4jClient, Neo4jConfig, KnowledgeGraphWriter
 from paper_retrieval.paper_metadata import search, build_citation_graph
 from relevance_scoring.relevance_scorer import compute_relevance_scores
 from dotenv import load_dotenv
@@ -44,6 +44,6 @@ if __name__ == "__main__":
     cfg = Neo4jConfig.from_env()
 
     with Neo4jClient(cfg) as client:
-        writer = PaperGraphWriter(client)
+        writer = KnowledgeGraphWriter(client)
         writer.ensure_schema()
         writer.persist_knowledge_graph(root_paper, edges)

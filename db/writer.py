@@ -23,7 +23,7 @@ def paper_props(p: ResearchPaper) -> Props:
     }
 
 
-class PaperGraphWriter:
+class KnowledgeGraphWriter:
     def __init__(self, client: Neo4jClient):
         self.client = client
 
