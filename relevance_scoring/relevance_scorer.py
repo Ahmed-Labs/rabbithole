@@ -7,6 +7,7 @@ from paper_retrieval import ResearchPaper
 from relevance_scoring.llm_scorer import LLMScorer
 from relevance_scoring.constants import *
 
+
 @dataclass
 class RelevanceScore:
     semantic_similarity: float
@@ -17,13 +18,15 @@ class RelevanceScore:
     @property
     def combined(self):
         existing_score = (
-            0.75 * self.semantic_similarity
-            + 0.15 * self.year_similarity
-            + 0.10 * self.citation_score
+            SEMANTIC_SIMILARITY_WEIGHT * self.semantic_similarity
+            + YEAR_SIMILARITY_WEIGHT * self.year_similarity
+            + CITATION_SCORE_WEIGHT * self.citation_score
         )
 
         if self.llm_score is not None:
-            return 0.5 * existing_score + 0.5 * self.llm_score
+            return (
+                1 - LLM_SCORE_WEIGHT
+            ) * existing_score + LLM_SCORE_WEIGHT * self.llm_score
 
         return existing_score
 
@@ -147,7 +150,7 @@ class RelevanceScorer:
                                 src_id=root_paper.id,
                                 dest_id=adj.id,
                                 relevance_score=score,
-                                llm_explanation=llm_description
+                                llm_explanation=llm_description,
                             )
                         )
                     scored.add(adj.id)

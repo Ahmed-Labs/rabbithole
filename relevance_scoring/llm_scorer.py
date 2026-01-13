@@ -1,22 +1,18 @@
 import os
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from paper_retrieval import ResearchPaper, session as r
-from dotenv import load_dotenv
-
-GPT_MODEL = "gpt-5-nano"
+from relevance_scoring.constants import *
 
 
 class LLMScorer:
-    def __init__(self):
-        load_dotenv()
-
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+    def __init__(self, api_key: Optional[str] = None):
+        resolved_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not resolved_key:
             raise ValueError(
                 "OpenAI API key required. Set OPENAI_API_KEY environment variable or pass api_key parameter."
             )
-        self.api_key = api_key
+        self.api_key = resolved_key
 
     def _create_prompt(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
@@ -104,9 +100,9 @@ class LLMScorer:
             # Validate and normalize score
             score = float(result.get("relevance_score", 0.5))
             score = max(0.0, min(1.0, score))  # Clamp to [0, 1]
-            
+
             return (score, result.get("explanation", ""))
-        
+
         except Exception as e:
             print(f"LLM scoring failed: {e}")
             return (-1, "")

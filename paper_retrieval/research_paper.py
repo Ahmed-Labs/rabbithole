@@ -1,7 +1,7 @@
 import io
 import fitz
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from paper_retrieval.session import session as r
 
 
@@ -61,6 +61,19 @@ class ResearchPaper:
     @property
     def meta(self) -> str:
         return f"{self.title} {self.abstract}".strip()
+    
+    @property
+    def bidirectional_citations(self) -> List[Tuple[str, str]]:
+        """
+        A list of citations represented by tuples of the form: (paper, cited_paper).
+        This includes both the paper's citations and other papers that cite
+        this paper.
+        """
+        out: List[Tuple[str, str]] = []
+        out.extend((self.id, r.id) for r in self.references)
+        out.extend((c.id, self.id) for c in self.citations)
+        return out
+
 
 # Global paper registry
 PAPER_REGISTRY: dict[str, ResearchPaper] = {}
