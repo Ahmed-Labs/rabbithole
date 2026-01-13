@@ -42,8 +42,17 @@ if __name__ == "__main__":
 
     # Persist to neo4j
     cfg = Neo4jConfig.from_env()
+    print("Loaded Neo4j config.")
 
     with Neo4jClient(cfg) as client:
-        writer = KnowledgeGraphWriter(client)
-        writer.ensure_schema()
-        writer.persist_knowledge_graph(root_paper, edges)
+        print(f"Connected to neo4j at {cfg.uri}.")
+        print("Persisting knowledge graph to neo4j...")
+        
+        try:
+            writer = KnowledgeGraphWriter(client)
+            writer.ensure_schema()
+            writer.persist_knowledge_graph(root_paper, edges)
+            print("Successfully persisted knoweldge graph!")
+        except Exception as e:
+            print("Failed to persist knowledge graph. Error:", e)
+
