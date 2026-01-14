@@ -14,4 +14,5 @@ docker run -p 6379:6379 redis
 Note: --pool=threads is not production-equivalent, on linux use prefork for production
 ```bash
 celery -A make_celery worker  --pool=threads  --concurrency=8  --loglevel=DEBUG  -E
+celery -A make_celery flower # in seperate terminal optionally run monitoring tool
 ```
