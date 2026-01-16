@@ -18,8 +18,12 @@ services:
       - "7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/rabbithole
+      - NEO4J_PLUGINS='["apoc"]'
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
     volumes:
       - neo4j_data:/data
+      - neo4j_plugins:/plugins
     restart: unless-stopped
 
   # --------------------
@@ -96,3 +100,4 @@ services:
 
 volumes:
   neo4j_data:
+  neo4j_plugins:

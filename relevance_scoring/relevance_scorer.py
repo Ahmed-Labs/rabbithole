@@ -9,7 +9,7 @@ from relevance_scoring.embedder import Embedder
 from relevance_scoring.llm_scorer import LLMScorer
 
 
-@dataclass
+@dataclass(frozen=True)
 class RelevanceScore:
     semantic_similarity: float
     year_similarity: float
@@ -32,12 +32,18 @@ class RelevanceScore:
         return existing_score
 
 
-@dataclass
+@dataclass(frozen=True)
 class RelevanceEdge:
     src_id: str
     dest_id: str
     relevance_score: RelevanceScore
     llm_explanation: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CitationEdge:
+    src_id: str
+    dest_id: str
 
 
 class RelevanceScorer:
