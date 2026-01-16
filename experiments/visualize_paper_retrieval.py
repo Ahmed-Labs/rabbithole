@@ -1,6 +1,8 @@
 from pathlib import Path
+
 from pyvis.network import Network
-from paper_retrieval.paper_metadata import search, get_references_recur
+
+from paper_retrieval.paper_metadata import get_references_recur, search
 from paper_retrieval.research_paper import ResearchPaper
 
 

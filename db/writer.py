@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Iterable, List, Tuple
 
+from db.client import Neo4jClient
 from paper_retrieval.research_paper import ResearchPaper
 from relevance_scoring.relevance_scorer import RelevanceEdge
-
-from db.client import Neo4jClient
-import json
 
 Props = Dict[str, Any]
 

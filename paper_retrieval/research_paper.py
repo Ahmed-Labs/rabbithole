@@ -1,9 +1,10 @@
 import io
-import fitz
 from dataclasses import dataclass, field
-from typing import Optional, List, Tuple
-from paper_retrieval.session import session as r
+from typing import List, Optional, Tuple
 
+import fitz
+
+from paper_retrieval.session import session as r
 
 
 @dataclass
@@ -22,9 +23,7 @@ class ResearchPaper:
     citations: List["ResearchPaper"] = field(default_factory=list)
 
     # Internal caches for full text
-    _full_text_cache: Optional[str] = field(
-        default=None, init=False, repr=False
-    )
+    _full_text_cache: Optional[str] = field(default=None, init=False, repr=False)
     _full_text_chunks_cache: Optional[List[str]] = field(
         default=None, init=False, repr=False
     )
@@ -45,7 +44,6 @@ class ResearchPaper:
 
         return self._full_text_cache
 
-
     @property
     def full_text_chunks(self) -> List[str]:
         if self._full_text_chunks_cache is not None:
@@ -54,14 +52,14 @@ class ResearchPaper:
         text = self.full_text
         if not text:
             return []
-        
+
         self._full_text_chunks_cache = chunk_text_for_embedding(text)
         return self._full_text_chunks_cache
-    
+
     @property
     def meta(self) -> str:
         return f"{self.title} {self.abstract}".strip()
-    
+
     @property
     def bidirectional_citations(self) -> List[Tuple[str, str]]:
         """
@@ -77,6 +75,7 @@ class ResearchPaper:
 
 # Global paper registry
 PAPER_REGISTRY: dict[str, ResearchPaper] = {}
+
 
 def new_research_paper(payload: dict) -> ResearchPaper:
     paper_id = payload.get("paperId")
@@ -97,6 +96,7 @@ def new_research_paper(payload: dict) -> ResearchPaper:
 
     PAPER_REGISTRY[paper_id] = paper
     return paper
+
 
 def extract_pdf_url(payload: dict) -> str:
     pdf_url = None

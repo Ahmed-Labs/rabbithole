@@ -1,11 +1,13 @@
-import torch
+from typing import Callable, List, Optional
+
 import numpy as np
-from typing import List, Optional, Callable
-from transformers import AutoTokenizer
+import torch
 from adapters import AutoAdapterModel
 from sklearn.metrics.pairwise import cosine_similarity
+from transformers import AutoTokenizer
 
 from relevance_scoring.embedding_cache import EmbeddingCache
+
 
 class Embedder:
     def __init__(
@@ -76,7 +78,7 @@ class Embedder:
             cached = self.cache.get(cache_key)
             if cached is not None:
                 return cached
-            
+
         if not chunks:
             fallback = self.embed("", cache_key)
             return fallback
@@ -105,7 +107,7 @@ class Embedder:
             self.cache.set(cache_key, max_pool_embedding)
 
         return max_pool_embedding
-    
+
     def lazy_embed_chunks(
         self,
         get_chunks: Callable[[], List[str]],
@@ -119,7 +121,6 @@ class Embedder:
 
         chunks = get_chunks()
         return self.embed_chunks(chunks, cache_key=cache_key)
-
 
     def compute_similarity(
         self, embedding1: np.ndarray, embedding2: np.ndarray
