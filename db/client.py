@@ -1,10 +1,10 @@
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from neo4j import GraphDatabase, Driver
-
+from neo4j import Driver, GraphDatabase
 
 Params = Dict[str, Any]
 

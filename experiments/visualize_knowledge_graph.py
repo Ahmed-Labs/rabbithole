@@ -1,14 +1,15 @@
 import textwrap
 from pathlib import Path
 from typing import Dict, List, Optional
+
 from pyvis.network import Network
 
-from paper_retrieval.paper_metadata import search, build_full_graph
+from paper_retrieval.paper_metadata import build_full_graph, search
 from paper_retrieval.research_paper import ResearchPaper
 from relevance_scoring.relevance_scorer import (
-    compute_relevance_scores,
     RelevanceEdge,
     RelevanceScore,
+    compute_relevance_scores,
 )
 
 

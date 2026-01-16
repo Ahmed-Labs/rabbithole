@@ -29,3 +29,11 @@ python -m experiments.visualize_relevance_scores
 Access the neo4j interactive UI through: http://localhost:7474/
 
 After logging in, you can run Cypher queries like `MATCH p=()-[r:RELEVANT_TO]->() RETURN p`
+
+### Code formatting
+
+Upon making changes, run the following tools to format and order imports:
+```bash
+isort .
+black .
+```

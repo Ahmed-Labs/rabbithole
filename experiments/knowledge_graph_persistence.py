@@ -1,8 +1,8 @@
-from db import Neo4jClient, Neo4jConfig, KnowledgeGraphWriter
-from paper_retrieval.paper_metadata import search, build_citation_graph
-from relevance_scoring.relevance_scorer import compute_relevance_scores
 from dotenv import load_dotenv
 
+from db import KnowledgeGraphWriter, Neo4jClient, Neo4jConfig
+from paper_retrieval.paper_metadata import build_citation_graph, search
+from relevance_scoring.relevance_scorer import compute_relevance_scores
 
 if __name__ == "__main__":
     load_dotenv()
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     with Neo4jClient(cfg) as client:
         print(f"Connected to neo4j at {cfg.uri}.")
         print("Persisting knowledge graph to neo4j...")
-        
+
         try:
             writer = KnowledgeGraphWriter(client)
             writer.ensure_schema()
@@ -55,4 +55,3 @@ if __name__ == "__main__":
             print("Successfully persisted knoweldge graph!")
         except Exception as e:
             print("Failed to persist knowledge graph. Error:", e)
-

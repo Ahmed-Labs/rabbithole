@@ -1,6 +1,7 @@
+import requests_cache
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import requests_cache
+
 
 def create_session():
     session = requests_cache.CachedSession(
@@ -29,5 +30,6 @@ def create_session():
     )
 
     return session
+
 
 session = create_session()
