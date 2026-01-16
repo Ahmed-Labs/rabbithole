@@ -1,20 +1,23 @@
 import textwrap
 from pathlib import Path
 from typing import Dict, List, Optional
-from pyvis.network import Network
-from dotenv import load_dotenv
 
-from paper_retrieval.paper_metadata import search, build_citation_graph
+from dotenv import load_dotenv
+from pyvis.network import Network
+
+from paper_retrieval.paper_metadata import build_citation_graph, search
 from paper_retrieval.research_paper import ResearchPaper
 from relevance_scoring.relevance_scorer import (
-    compute_relevance_scores,
     RelevanceEdge,
     RelevanceScore,
+    compute_relevance_scores,
 )
+
 
 def wrap_text(text: str, width: int = 80) -> str:
     """Wrap LLM explanation to avoid overflow in hover tooltip."""
     return "\n".join(textwrap.wrap(text, width))
+
 
 def index_papers(root: ResearchPaper) -> Dict[str, ResearchPaper]:
     """Build a mapping from paper id → ResearchPaper by traversing the graph."""
@@ -132,10 +135,7 @@ def build_graph_with_scores(
             relevance_for_label = (
                 scores_map.get(paper.id).combined if paper.id in scores_map else 0.0
             )
-            node_label = (
-                f"{paper.title[:30]}\n"
-                f"Rel: {relevance_for_label:.3f}"
-            )
+            node_label = f"{paper.title[:30]}\n" f"Rel: {relevance_for_label:.3f}"
 
         node_title = f"{paper.title}\n\n{score_info}"
 
@@ -204,9 +204,7 @@ def print_top_papers(
     print(f"{'=' * 100}\n")
 
     # Sort by combined score (descending)
-    sorted_edges = sorted(
-        edges, key=lambda e: e.relevance_score.combined, reverse=True
-    )
+    sorted_edges = sorted(edges, key=lambda e: e.relevance_score.combined, reverse=True)
 
     for i, edge in enumerate(sorted_edges[:top_n], 1):
         paper = paper_index.get(edge.dest_id)
@@ -236,13 +234,11 @@ def print_stats(edges: List[RelevanceEdge]):
 
     print(f"Total papers scored: {len(edges)}")
 
-    avg_semantic = (
-        sum(e.relevance_score.semantic_similarity for e in edges) / len(edges)
+    avg_semantic = sum(e.relevance_score.semantic_similarity for e in edges) / len(
+        edges
     )
     avg_year = sum(e.relevance_score.year_similarity for e in edges) / len(edges)
-    avg_citation = (
-        sum(e.relevance_score.citation_score for e in edges) / len(edges)
-    )
+    avg_citation = sum(e.relevance_score.citation_score for e in edges) / len(edges)
     avg_combined = sum(e.relevance_score.combined for e in edges) / len(edges)
 
     print(f"\nAverage semantic similarity: {avg_semantic:.4f}")

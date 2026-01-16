@@ -1,11 +1,12 @@
-from typing import List, Tuple, Optional, Set
 from dataclasses import dataclass
+from typing import List, Optional, Set, Tuple
+
 import numpy as np
 
-from relevance_scoring.embedder import Embedder
 from paper_retrieval import ResearchPaper
-from relevance_scoring.llm_scorer import LLMScorer
 from relevance_scoring.constants import *
+from relevance_scoring.embedder import Embedder
+from relevance_scoring.llm_scorer import LLMScorer
 
 
 @dataclass

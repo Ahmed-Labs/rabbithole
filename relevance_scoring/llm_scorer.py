@@ -1,7 +1,9 @@
 import os
 import re
-from typing import Dict, Any, Optional
-from paper_retrieval import ResearchPaper, session as r
+from typing import Any, Dict, Optional
+
+from paper_retrieval import ResearchPaper
+from paper_retrieval import session as r
 from relevance_scoring.constants import *
 
 
