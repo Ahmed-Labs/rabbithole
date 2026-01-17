@@ -19,13 +19,6 @@ def create_app():
     app = Flask(__name__)
 
     # ---- Celery config (simple & explicit) ----
-    app.config.from_mapping(
-        CELERY=dict(
-            broker_url="redis://localhost",
-            result_backend="redis://localhost",
-            task_ignore_result=True,
-        ),
-    )
     app.config.from_prefixed_env()
     app.config["CELERY"] = {
         "broker_url": app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"),

@@ -15,7 +15,7 @@ def search(query, limit=50) -> list[ResearchPaper]:
     }
 
     url = f"{API_URL}/paper/search"
-    resp = r.get(url, params=params)
+    resp = r().get(url, params=params)
     resp.raise_for_status()
 
     results = resp.json().get("data", [])
@@ -47,7 +47,7 @@ def get_references(
 
         url = f"{API_URL}/paper/{paper_id}/references"
         params = {"fields": DEFAULT_FIELDS, "limit": page_limit, "offset": offset}
-        resp = r.get(url, params=params)
+        resp = r().get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
 
@@ -88,7 +88,7 @@ def get_citations(
 
         url = f"{API_URL}/paper/{paper_id}/citations"
         params = {"fields": DEFAULT_FIELDS, "limit": page_limit, "offset": offset}
-        resp = r.get(url, params=params)
+        resp = r().get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
 
