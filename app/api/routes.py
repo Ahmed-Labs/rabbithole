@@ -1,3 +1,4 @@
+from celery.result import AsyncResult
 from flask import jsonify, request
 
 from app.api import bp
@@ -26,12 +27,21 @@ def get_relevance():
         max_references=max_references,
     )
 
-    return (
-        jsonify(
-            {
-                "task_id": task.id,
-                "status": "queued",
-            }
-        ),
-        202,
-    )
+    return jsonify({"task_id": task.id, "status": "queued"}), 202
+
+
+@bp.route("/task-status/<task_id>")
+def task_status(task_id: str):
+    result = AsyncResult(task_id)
+
+    response = {
+        "task_id": task_id,
+        "status": result.state,
+    }
+
+    if result.successful():
+        response["result"] = result.result
+    elif result.failed():
+        response["error"] = str(result.info)
+
+    return jsonify(response)
