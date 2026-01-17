@@ -68,7 +68,7 @@ class ResearchPaper:
         this paper.
         """
         out: List[Tuple[str, str]] = []
-        out.extend((self.id, r().id) for r in self.references)
+        out.extend((self.id, r.id) for r in self.references)
         out.extend((c.id, self.id) for c in self.citations)
         return out
 
@@ -112,7 +112,7 @@ def extract_pdf_url(payload: dict) -> str:
 
 
 def fetch_pdf_text(pdf_url: str) -> str:
-    resp = r().get(pdf_url, headers={"User-Agent": "Mozilla/5.0"})
+    resp = r.get(pdf_url, headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
 
     pdf_bytes = io.BytesIO(resp.content)

@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 import requests_cache
 from redis import Redis
@@ -8,22 +9,13 @@ from urllib3.util.retry import Retry
 
 def create_session():
     redis_url = os.getenv("REDIS_CACHE_URL")
-
-    print(f"DEBUG: REDIS_CACHE_URL = {redis_url}")
-
     if not redis_url:
         raise RuntimeError("REDIS_CACHE_URL is not set")
 
-    # Parse Redis URL manually
-    from urllib.parse import urlparse
-
     parsed = urlparse(redis_url)
-
     redis_host = parsed.hostname or "localhost"
     redis_port = parsed.port or 6379
     redis_db = int(parsed.path.lstrip("/")) if parsed.path else 0
-
-    print(f"DEBUG: Redis config - host={redis_host}, port={redis_port}, db={redis_db}")
 
     session = requests_cache.CachedSession(
         backend="redis",
@@ -31,11 +23,12 @@ def create_session():
         expire_after=60 * 60 * 24 * 7,
         allowable_methods=("GET", "POST"),
         connection=Redis(
-            host=redis_host, port=redis_port, db=redis_db, decode_responses=False
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            decode_responses=False,
         ),
     )
-
-    print(f"DEBUG: Session created with Redis backend")
 
     retries = Retry(
         total=5,
@@ -61,11 +54,16 @@ def create_session():
     return session
 
 
-_session = None
+class _SessionProxy:
+    _session = None
+
+    def _get(self):
+        if self._session is None:
+            self._session = create_session()
+        return self._session
+
+    def __getattr__(self, name):
+        return getattr(self._get(), name)
 
 
-def session():
-    global _session
-    if _session is None:
-        _session = create_session()
-    return _session
+session = _SessionProxy()

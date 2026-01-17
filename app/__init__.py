@@ -1,6 +1,9 @@
 from celery import Celery, Task
 from flask import Flask
 
+from app.api import bp as api_bp
+from app.main import bp as main_bp
+
 
 def celery_init_app(app: Flask) -> Celery:
     class FlaskTask(Task):
@@ -18,23 +21,18 @@ def celery_init_app(app: Flask) -> Celery:
 def create_app():
     app = Flask(__name__)
 
-    # ---- Celery config (simple & explicit) ----
+    # Load configuration from environment variables
     app.config.from_prefixed_env()
     app.config["CELERY"] = {
         "broker_url": app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"),
         "result_backend": app.config.get(
-            "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
+            "CELERY_RESULT_BACKEND", "redis://localhost:6379/1"
         ),
     }
     celery_init_app(app)
 
-    # ---- Blueprints ----
-    from app.api import bp as api_bp
-
+    # Register blueprints
     app.register_blueprint(api_bp, url_prefix="/api")
-
-    from app.main import bp as main_bp
-
     app.register_blueprint(main_bp)
 
     return app

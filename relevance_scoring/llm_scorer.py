@@ -92,7 +92,7 @@ class LLMScorer:
         }
 
         try:
-            resp = r().post(url, headers=headers, json=payload, timeout=60)
+            resp = r.post(url, headers=headers, json=payload, timeout=60)
             resp.raise_for_status()
             data = resp.json()
 
