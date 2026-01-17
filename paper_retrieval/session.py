@@ -9,6 +9,9 @@ def create_session():
         cache_name="httpcache",
         expire_after=60 * 60 * 24 * 7,
         allowable_methods=("GET", "POST"),
+        connection_kwargs={
+            "db": 1,
+        },
     )
 
     retries = Retry(

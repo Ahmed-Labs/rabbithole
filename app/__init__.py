@@ -27,6 +27,12 @@ def create_app():
         ),
     )
     app.config.from_prefixed_env()
+    app.config["CELERY"] = {
+        "broker_url": app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+        "result_backend": app.config.get(
+            "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
+        ),
+    }
     celery_init_app(app)
 
     # ---- Blueprints ----

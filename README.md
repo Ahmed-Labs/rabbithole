@@ -38,25 +38,26 @@ isort .
 black .
 ```
 
-### Celery setup (tentative, will move to docker)
+### Celery setup, assuming redis is up (tentative, will move following steps to docker)
 
 1. get backend running with
 ```bash
-python run.py
+flask run
 ```
 
-2. get redis container running with
-```bash
-docker run -p 6379:6379 redis
-```
-
-3. get celery worker running with
+2. get celery worker running with
 ```bash
 celery -A app.celery_app:celery_app worker --pool=solo --loglevel=INFO -E
 ```
 
-4. optional - get flower monitoring tool for celery with
+3. optional - get flower monitoring tool for celery with
 ```bash
 celery -A app.celery_app:celery_app flower --port=5555
 ```
 
+4. test a post request on windows
+> Invoke-RestMethod ` 
+>>   -Uri http://localhost:5000/api/get-relevance `
+>>   -Method POST `
+>>   -Headers @{ "Content-Type" = "application/json" } `
+>>   -Body '{"query":"chinese ev","max_depth":1,"max_references":10}'
