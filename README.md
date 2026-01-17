@@ -46,22 +46,38 @@ black .
 
 ### Testing the API
 
-Test a POST request to the relevance endpoint (Windows PowerShell):
+**1. Submit a task** (Windows PowerShell):
 ```powershell
-Invoke-RestMethod `
+$response = Invoke-RestMethod `
   -Uri http://localhost:5000/api/get-relevance `
   -Method POST `
   -Headers @{ "Content-Type" = "application/json" } `
   -Body '{"query":"phasor","max_depth":1,"max_references":10}'
+
+$taskId = $response.task_id
 ```
 
-You should receive a response with:
+**2. Check task status:**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:5000/api/task-status/$taskId"
+```
+
+Response when complete:
 ```json
 {
-  "status": "queued",
-  "task_id": "abc123..."
+  "task_id": "abc123...",
+  "status": "SUCCESS",
+  "result": {
+    "status": "success",
+    "query": "phasor",
+    "root_paper": "...",
+    "papers_processed": 42
+  }
 }
 ```
+
+**3. Verify in Neo4j:**
+Navigate to http://localhost:7474 and run queries to view the persisted knowledge graph.
 
 ### Monitoring Celery tasks with Flower
 
