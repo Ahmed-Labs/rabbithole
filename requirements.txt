@@ -13,5 +13,7 @@ redis
 requests-cache
 Flask>=3.0.0
 neo4j==5.28.2
+celery
+flower
 black>=24.0
 isort>=5.12

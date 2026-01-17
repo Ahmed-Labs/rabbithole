@@ -11,11 +11,17 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Spin up Redis and Neo4j
+### 3. Spin up Redis, Neo4j, Flask backend, and Celery worker
 Make sure you have docker running and run the following command:
 ```bash
 docker compose up -d
 ```
+
+This will start:
+- Redis (message broker and cache)
+- Neo4j (graph database)
+- Flask API (backend server on port 5000)
+- Celery worker (background task processor)
 
 ### 4. Run any module/submodule. Example:
 ```bash
@@ -37,3 +43,53 @@ Upon making changes, run the following tools to format and order imports:
 isort .
 black .
 ```
+
+### Testing the API
+
+**1. Submit a task** (Windows PowerShell):
+```powershell
+$response = Invoke-RestMethod `
+  -Uri http://localhost:5000/api/get-relevance `
+  -Method POST `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{"query":"phasor","max_depth":1,"max_references":10}'
+
+$taskId = $response.task_id
+```
+
+**2. Check task status:**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:5000/api/task-status/$taskId"
+```
+
+Response when complete:
+```json
+{
+  "task_id": "abc123...",
+  "status": "SUCCESS",
+  "result": {
+    "status": "success",
+    "query": "phasor",
+    "root_paper": "...",
+    "papers_processed": 42
+  }
+}
+```
+
+**3. Verify in Neo4j:**
+Navigate to http://localhost:7474 and run queries to view the persisted knowledge graph.
+
+### Monitoring Celery tasks with Flower
+
+To monitor Celery workers and tasks in real-time, run Flower locally:
+```bash
+celery -A app.celery_app:celery_app flower --port=5555
+```
+
+Then access the Flower dashboard at: http://localhost:5555
+
+You can view:
+- Active/completed/failed tasks
+- Worker status and performance
+- Task execution history
+- Real-time task monitoring
