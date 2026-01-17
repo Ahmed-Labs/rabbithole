@@ -37,3 +37,26 @@ Upon making changes, run the following tools to format and order imports:
 isort .
 black .
 ```
+
+### Celery setup (tentative, will move to docker)
+
+1. get backend running with
+```bash
+python run.py
+```
+
+2. get redis container running with
+```bash
+docker run -p 6379:6379 redis
+```
+
+3. get celery worker running with
+```bash
+celery -A app.celery_app:celery_app worker --pool=solo --loglevel=INFO -E
+```
+
+4. optional - get flower monitoring tool for celery with
+```bash
+celery -A app.celery_app:celery_app flower --port=5555
+```
+
