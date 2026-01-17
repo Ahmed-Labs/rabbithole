@@ -9,7 +9,7 @@ from relevance_scoring.embedder import Embedder
 from relevance_scoring.llm_scorer import LLMScorer
 
 
-@dataclass(frozen=True)
+@dataclass
 class RelevanceScore:
     semantic_similarity: float
     year_similarity: float

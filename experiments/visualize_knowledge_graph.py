@@ -2,9 +2,10 @@ import textwrap
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from dotenv import load_dotenv
 from pyvis.network import Network
 
-from paper_retrieval.paper_metadata import build_full_graph, search
+from paper_retrieval.paper_metadata import build_citation_graph, search
 from paper_retrieval.research_paper import ResearchPaper
 from relevance_scoring.relevance_scorer import (
     RelevanceEdge,
@@ -250,6 +251,7 @@ def print_stats(edges: List[RelevanceEdge]):
 
 
 if __name__ == "__main__":
+    load_dotenv()
     query = input("Enter search query: ").strip()
     papers = search(query)
 
@@ -271,7 +273,7 @@ if __name__ == "__main__":
     print(f"  Depth: {depth} levels")
     print(f"  Max per level: {max_per_level} papers")
 
-    root_paper = build_full_graph(
+    root_paper = build_citation_graph(
         root_paper,
         depth=depth,
         max_per_level=max_per_level,
