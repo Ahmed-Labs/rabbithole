@@ -19,9 +19,10 @@ docker compose up -d
 
 This will start:
 - Redis (message broker and cache)
-- Neo4j (graph database)
-- Flask API (backend server on port 5000)
+- Neo4j (graph database) - http://localhost:7474
+- Flask API (backend server) - http://localhost:5000
 - Celery worker (background task processor)
+- Flower (Celery monitoring) - http://localhost:5555
 
 ### 4. Run any module/submodule. Example:
 ```bash
