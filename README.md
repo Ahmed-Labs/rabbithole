@@ -19,9 +19,10 @@ docker compose up -d
 
 This will start:
 - Redis (message broker and cache)
-- Neo4j (graph database)
-- Flask API (backend server on port 5000)
+- Neo4j (graph database) - http://localhost:7474
+- Flask API (backend server) - http://localhost:5000
 - Celery worker (background task processor)
+- Flower (Celery monitoring) - http://localhost:5555
 
 ### 4. Run any module/submodule. Example:
 ```bash
@@ -76,20 +77,6 @@ Response when complete:
 }
 ```
 
-**3. Verify in Neo4j:**
-Navigate to http://localhost:7474 and run queries to view the persisted knowledge graph.
-
-### Monitoring Celery tasks with Flower
-
-To monitor Celery workers and tasks in real-time, run Flower locally:
-```bash
-celery -A app.celery_app:celery_app flower --port=5555
-```
-
-Then access the Flower dashboard at: http://localhost:5555
-
-You can view:
-- Active/completed/failed tasks
-- Worker status and performance
-- Task execution history
-- Real-time task monitoring
+**3. Verify results:**
+- **Flower:** Monitor task execution at http://localhost:5555
+- **Neo4j:** View the persisted knowledge graph at http://localhost:7474
