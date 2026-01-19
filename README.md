@@ -80,3 +80,18 @@ Response when complete:
 **3. Verify results:**
 - **Flower:** Monitor task execution at http://localhost:5555
 - **Neo4j:** View the persisted knowledge graph at http://localhost:7474
+
+### Frontend
+cd to frontend
+
+Install dependancies
+```bash
+npm install 
+```
+
+Run dev server
+```bash
+npm run dev
+```
+Site will be displayed at http://localhost:5173/
+
