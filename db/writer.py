@@ -1,25 +1,9 @@
-from __future__ import annotations
-
 import json
 from typing import Any, Dict, Iterable, List, Tuple
 
 from db.client import Neo4jClient
 from paper_retrieval.research_paper import ResearchPaper
 from relevance_scoring.relevance_scorer import RelevanceEdge
-
-Props = Dict[str, Any]
-
-
-def paper_props(p: ResearchPaper) -> Props:
-    return {
-        "url": p.url,
-        "title": p.title,
-        "abstract": p.abstract,
-        "pdf_url": p.pdf_url,
-        "year": p.year,
-        "citation_count": p.citation_count,
-        "authors": [json.dumps(author) for author in p.authors],
-    }
 
 
 class KnowledgeGraphWriter:
@@ -35,7 +19,7 @@ class KnowledgeGraphWriter:
         )
 
     def upsert_papers(self, papers: Iterable[ResearchPaper]) -> None:
-        rows = [{"id": p.id, "props": paper_props(p)} for p in papers]
+        rows = [{"id": p.id, "props": p.to_props()} for p in papers]
         self.client.run_write(
             """
             UNWIND $rows AS row
@@ -61,7 +45,7 @@ class KnowledgeGraphWriter:
         rows: List[dict] = []
         for e in edges:
             s = e.relevance_score
-            props: Props = {
+            props = {
                 "semantic_similarity": s.semantic_similarity,
                 "year_similarity": s.year_similarity,
                 "citation_score": s.citation_score,

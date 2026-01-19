@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import io
+import json
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import fitz
 
@@ -71,6 +74,33 @@ class ResearchPaper:
         out.extend((self.id, r.id) for r in self.references)
         out.extend((c.id, self.id) for c in self.citations)
         return out
+
+    def to_props(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "url": self.url,
+            "title": self.title,
+            "abstract": self.abstract,
+            "pdf_url": self.pdf_url,
+            "year": self.year,
+            "citation_count": self.citation_count,
+            "authors": [json.dumps(a) for a in self.authors],
+        }
+
+    @classmethod
+    def from_props(cls, d) -> ResearchPaper:
+        return cls(
+            id=d.get("id"),
+            url=d.get("url", ""),
+            title=d.get("title", ""),
+            abstract=d.get("abstract", ""),
+            pdf_url=d.get("pdf_url"),
+            year=d.get("year"),
+            citation_count=d.get("citation_count"),
+            authors=[
+                json.loads(a) if isinstance(a, str) else a for a in d.get("authors", [])
+            ],
+        )
 
 
 # Global paper registry

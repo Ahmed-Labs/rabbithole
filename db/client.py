@@ -45,11 +45,19 @@ class Neo4jClient:
 
     def run_write(self, cypher: str, params: Optional[Params] = None) -> None:
         params = params or {}
+
+        def work(tx):
+            tx.run(cypher, **params).consume()
+
         with self._driver.session() as session:
-            session.execute_write(lambda tx: tx.run(cypher, **params).consume())
+            session.execute_write(work)
 
     def run_read(self, cypher: str, params: Optional[Params] = None) -> list[dict]:
         params = params or {}
+
+        def _work(tx):
+            result = tx.run(cypher, **params)
+            return [r.data() for r in result]
+
         with self._driver.session() as session:
-            res = session.execute_read(lambda tx: tx.run(cypher, **params))
-            return [r.data() for r in res]
+            return session.execute_read(_work)
