@@ -82,16 +82,33 @@ Response when complete:
 - **Neo4j:** View the persisted knowledge graph at http://localhost:7474
 
 ### Frontend
-cd to frontend
 
-Install dependancies
+**1. Navigate to frontend directory:**
+
 ```bash
-npm install 
+cd frontend
 ```
 
-Run dev server
+**2. Install dependencies:**
+
+```bash
+npm install
+```
+
+**3. Run development server:**
+
 ```bash
 npm run dev
 ```
+
 Site will be displayed at http://localhost:5173/
 
+**4. Code quality (optional):**
+
+```bash
+# Check for linting issues
+npm run lint
+
+# Auto-format code
+npm run format
+```

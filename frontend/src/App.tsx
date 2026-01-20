@@ -1,4 +1,4 @@
-import rabbitLogo from './assets/rabbit-logo.png';
+import rabbitLogo from "./assets/rabbit-logo.png";
 
 function App() {
   return (
@@ -17,7 +17,8 @@ function App() {
       <main className="flex-1 flex items-start justify-center px-6 pt-12">
         <div className="w-full max-w-4xl bg-[#1b2838] rounded-2xl p-8">
           <p className="text-zinc-300 mb-6">
-            Search papers and explore a knowledge graph of citations and relevance.
+            Search papers and explore a knowledge graph of citations and
+            relevance.
           </p>
 
           {/* Search Input */}
@@ -41,9 +42,7 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="px-6 py-4 text-zinc-500 text-sm">
-        RabbitHole
-      </footer>
+      <footer className="px-6 py-4 text-zinc-500 text-sm">RabbitHole</footer>
     </div>
   );
 }
