@@ -46,6 +46,9 @@ Before using the frontend, ensure the Flask backend is running:
    - **Option B: Run locally** (What I did):
 
      ```bash
+     # Install Python dependencies (do this on a virtual environment preferably)
+     pip install -r requirements.txt
+
      # Set environment variables in .env file in the root path
      REDIS_CACHE_URL="redis://localhost:6379/2"
      CELERY_BROKER_URL="redis://localhost:6379/0"
