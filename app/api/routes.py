@@ -3,11 +3,26 @@ from flask import jsonify, request
 
 from app.api import bp
 from app.services.relevance_tasks import get_relevance_task
+from paper_retrieval.paper_metadata import search
 
 
 @bp.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@bp.route("/search", methods=["GET"])
+def search_papers():
+    query = request.args.get("query")
+    if not query:
+        return jsonify({"error": "Missing 'query' parameter"}), 400
+
+    limit = 10
+
+    papers = search(query, limit=limit)
+    papers_data = [paper.to_props() for paper in papers]
+
+    return jsonify({"papers": papers_data})
 
 
 @bp.route("/get-relevance", methods=["POST"])

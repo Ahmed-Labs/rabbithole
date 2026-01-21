@@ -84,7 +84,8 @@ class ResearchPaper:
             "pdf_url": self.pdf_url,
             "year": self.year,
             "citation_count": self.citation_count,
-            "authors": [json.dumps(a) for a in self.authors],
+            # "authors": [json.dumps(a) for a in self.authors],
+            "authors": self.authors,
         }
 
     @classmethod

@@ -23,6 +23,7 @@ def create_app():
 
     # Load configuration from environment variables
     app.config.from_prefixed_env()
+    app.config["JSON_AS_ASCII"] = False
     app.config["CELERY"] = {
         "broker_url": app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"),
         "result_backend": app.config.get(
