@@ -1,5 +1,6 @@
 from celery import Celery, Task
 from flask import Flask
+from flask_cors import CORS
 
 from app.api import bp as api_bp
 from app.main import bp as main_bp
@@ -20,6 +21,9 @@ def celery_init_app(app: Flask) -> Celery:
 
 def create_app():
     app = Flask(__name__)
+
+    # Enable CORS for all routes
+    CORS(app, origins=["http://localhost:5173", "http://localhost:5174"])
 
     # Load configuration from environment variables
     app.config.from_prefixed_env()
