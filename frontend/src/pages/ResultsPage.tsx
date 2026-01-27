@@ -15,7 +15,7 @@ export function ResultsPage({ searchQuery, onNewSearch }: ResultsPageProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const previewScrollRef = useRef<HTMLElement | null>(null);
+  const previewScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const mapPaper = (p: {
@@ -78,46 +78,47 @@ export function ResultsPage({ searchQuery, onNewSearch }: ResultsPageProps) {
   );
 
   return (
-    <div className="min-h-screen bg-[#0d1b2a] text-white flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-        <div className="flex items-center gap-1 text-2xl font-semibold">
-          RabbitHole
-          <img
-            src={rabbitLogo}
-            alt="Logo"
-            className="h-6 w-auto align-middle"
-          />
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onNewSearch}
-            className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors"
-          >
-            New search
-          </button>
-          <button className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors">
-            Settings
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#090D14] text-white flex flex-col">
+      {/* Header Container Box */}
+      <div className="p-6 pb-0">
+        <header className="flex items-center justify-between px-6 py-4 bg-[#141E2D] rounded-lg">
+          <div className="flex items-center gap-1 text-2xl font-semibold">
+            RabbitHole
+            <img
+              src={rabbitLogo}
+              alt="Logo"
+              className="h-6 w-auto align-middle"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onNewSearch}
+              className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors"
+            >
+              New search
+            </button>
+            <button className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors">
+              Settings
+            </button>
+          </div>
+        </header>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden p-6 gap-6 items-stretch">
         {/* Left Panel - Results */}
-        <aside className="w-1/3 border-r border-zinc-800 bg-zinc-900 flex flex-col">
-          <div className="p-4 border-b border-zinc-800">
-            <h2 className="text-lg font-semibold mb-3">Results</h2>
+        <aside className="w-1/3 flex flex-col">
+          {/* Results Container Box */}
+          <div className="flex-1 min-h-0 flex flex-col bg-[#101723] rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-3 text-white">Results</h2>
             <input
               type="text"
               placeholder="Search within results"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-[#141E2D] border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 mb-4"
             />
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
             {loading ? (
               <div className="text-center text-zinc-500 py-8">Loading...</div>
             ) : error ? (
@@ -143,15 +144,19 @@ export function ResultsPage({ searchQuery, onNewSearch }: ResultsPageProps) {
                 />
               ))
             )}
+            </div>
           </div>
         </aside>
 
         {/* Right Panel - Preview */}
-        <section
-          ref={previewScrollRef}
-          className="flex-1 bg-[#0d1b2a] p-6 overflow-y-auto"
-        >
-          <PaperPreview paper={selectedPaper} />
+        <section className="flex-1 flex flex-col">
+          {/* Preview Container Box */}
+          <div
+            ref={previewScrollRef}
+            className="flex-1 min-h-0 overflow-y-auto p-6 bg-[#101723] rounded-lg"
+          >
+            <PaperPreview paper={selectedPaper} />
+          </div>
         </section>
       </main>
     </div>

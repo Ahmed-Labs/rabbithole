@@ -19,22 +19,27 @@ export function PaperPreview({ paper }: PaperPreviewProps) {
 
   return (
     <div className="flex flex-col">
-      {/* Paper Details */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-white mb-3">{paper.title}</h2>
+      {/* Root paper preview */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold text-white mb-4">
+          Root paper preview
+        </h2>
+        <h3 className="text-xl font-semibold text-white mb-3">
+          {paper.title}
+        </h3>
         <div className="flex gap-2 mb-4">
-          <span className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-sm">
+          <span className="px-3 py-1 bg-[#141E2D] text-zinc-300 rounded-full text-sm">
             {paper.year || "N/A"}
           </span>
-          <span className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-sm">
+          <span className="px-3 py-1 bg-[#141E2D] text-zinc-300 rounded-full text-sm">
             IEEE
           </span>
-          <span className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-sm">
+          <span className="px-3 py-1 bg-[#141E2D] text-zinc-300 rounded-full text-sm">
             {paper.citationCount} citations
           </span>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 p-4 bg-[#141E2D] rounded-lg">
           <h3 className="text-white font-medium mb-2">Abstract</h3>
           <p className="text-zinc-300 text-sm leading-relaxed">
             {paper.abstract || "No abstract available."}
@@ -43,7 +48,11 @@ export function PaperPreview({ paper }: PaperPreviewProps) {
       </div>
 
       {/* Analysis Options */}
-      <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-white mb-4">
+          Analysis options
+        </h2>
+        <div className="space-y-4">
         <div>
           <label className="block text-sm text-zinc-400 mb-2">
             Reference depth:
@@ -76,8 +85,9 @@ export function PaperPreview({ paper }: PaperPreviewProps) {
           </button>
         </div>
 
+        </div>
         {/* Analyze Button */}
-        <div className="pt-2">
+        <div className="pt-4">
           <button className="w-full px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-medium rounded-lg transition-colors">
             Analyze
           </button>

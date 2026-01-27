@@ -16,21 +16,23 @@ export function HomePage({ onSearch }: HomePageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1b2a] text-white flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-1 text-2xl font-semibold">
-          RabbitHole
-          <img
-            src={rabbitLogo}
-            alt="Logo"
-            className="h-6 w-auto align-middle"
-          />
-        </div>
-        <button className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors">
-          Settings
-        </button>
-      </header>
+    <div className="min-h-screen bg-[#090D14] text-white flex flex-col">
+      {/* Header Container Box */}
+      <div className="p-6 pb-0">
+        <header className="flex items-center justify-between px-6 py-4 bg-[#141E2D] rounded-lg">
+          <div className="flex items-center gap-1 text-2xl font-semibold">
+            RabbitHole
+            <img
+              src={rabbitLogo}
+              alt="Logo"
+              className="h-6 w-auto align-middle"
+            />
+          </div>
+          <button className="px-4 py-2 border border-zinc-600 rounded-lg text-sm hover:bg-zinc-800 transition-colors">
+            Settings
+          </button>
+        </header>
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 flex items-start justify-center px-6 pt-12">
