@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { HomePage } from "./pages/HomePage";
 import { ResultsPage } from "./pages/ResultsPage";
+import "./App.css";
 
 type View = "home" | "results";
 
