@@ -1,5 +1,4 @@
-import json
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Iterable, List, Tuple
 
 from db.client import Neo4jClient
 from paper_retrieval.research_paper import ResearchPaper
