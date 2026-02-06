@@ -2,9 +2,9 @@ from celery import Celery, Task
 from flask import Flask
 
 from app.api import bp as api_bp
+from app.api.graph_service import GraphQueryService
 from app.main import bp as main_bp
 from db import KnowledgeGraphReader, Neo4jClient, Neo4jConfig
-from db.services import GraphQueryService
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -43,6 +43,7 @@ def create_app():
             "CELERY_RESULT_BACKEND", "redis://localhost:6379/1"
         ),
     }
+
     # Initialize extensions
     celery_init_app(app)
     init_neo4j(app)
