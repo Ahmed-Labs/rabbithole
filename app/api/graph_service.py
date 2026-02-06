@@ -47,29 +47,6 @@ class GraphQueryService:
 
         return filtered_papers, filtered_relevance, filtered_citations
 
-    def get_paper_with_scores(self, paper_id: str) -> Optional[Dict[str, Any]]:
-        papers, relevance_edges, _ = self.reader.read(paper_id)
-
-        if not papers:
-            return None
-
-        paper = next((p for p in papers if p.id == paper_id), None)
-        if not paper:
-            return None
-
-        connected_edges = [
-            e for e in relevance_edges if e.src_id == paper_id or e.dest_id == paper_id
-        ]
-
-        scores = self._compute_aggregate_scores(connected_edges)
-        explanation = self._get_best_explanation(connected_edges)
-
-        return {
-            "paper": paper,
-            "relevance_scores": scores,
-            "explanation": explanation,
-        }
-
     def _apply_paper_filters(
         self, papers: List[ResearchPaper], filters: GraphFilters
     ) -> List[ResearchPaper]:
@@ -98,34 +75,3 @@ class GraphQueryService:
             if e.relevance_score.llm_score
             and e.relevance_score.llm_score >= min_similarity
         ]
-
-    def _compute_aggregate_scores(self, edges: List[RelevanceEdge]) -> Dict[str, float]:
-        if not edges:
-            return {
-                "overall": 0.0,
-                "semantic_similarity": 0.0,
-                "llm_similarity": 0.0,
-                "year_similarity": 0.0,
-                "citation_score": 0.0,
-            }
-
-        scores = [e.relevance_score for e in edges]
-
-        def safe_avg(values: List[Optional[float]]) -> float:
-            valid = [v for v in values if v is not None]
-            return sum(valid) / len(valid) if valid else 0.0
-
-        return {
-            "overall": safe_avg([s.llm_score for s in scores]),
-            "semantic_similarity": safe_avg([s.semantic_similarity for s in scores]),
-            "llm_similarity": safe_avg([s.llm_score for s in scores]),
-            "year_similarity": safe_avg([s.year_similarity for s in scores]),
-            "citation_score": safe_avg([s.citation_score for s in scores]),
-        }
-
-    def _get_best_explanation(self, edges: List[RelevanceEdge]) -> Optional[str]:
-        if not edges:
-            return None
-
-        best = max(edges, key=lambda e: e.relevance_score.llm_score or 0.0)
-        return best.llm_explanation

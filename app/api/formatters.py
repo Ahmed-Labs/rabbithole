@@ -40,16 +40,6 @@ class ReactFlowFormatter:
         }
 
     @staticmethod
-    def format_paper_details(
-        paper: ResearchPaper, scores: Dict[str, float], explanation: Optional[str]
-    ) -> Dict[str, Any]:
-        return {
-            **paper.to_props(),
-            "relevance_score": scores,
-            "relevance_explanation": explanation,
-        }
-
-    @staticmethod
     def _calc_paper_scores(
         papers: List[ResearchPaper], relevance_edges: List[RelevanceEdge]
     ) -> Dict[str, float]:

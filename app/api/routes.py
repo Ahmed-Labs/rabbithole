@@ -109,24 +109,3 @@ def get_graph(paper_id: str):
     }
 
     return jsonify(graph_data)
-
-
-@bp.route("/paper/<paper_id>", methods=["GET"])
-def get_paper_details(paper_id: str):
-    """
-    Get detailed paper information for Inspector panel.
-
-    Returns:
-        JSON with paper metadata and aggregated relevance scores
-    """
-    graph_service = get_graph_service()
-    result = graph_service.get_paper_with_scores(paper_id)
-
-    if not result:
-        return jsonify({"error": "Paper not found"}), 404
-
-    details = ReactFlowFormatter.format_paper_details(
-        result["paper"], result["relevance_scores"], result["explanation"]
-    )
-
-    return jsonify(details)
