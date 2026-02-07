@@ -78,7 +78,7 @@ def get_graph(paper_id: str):
         - min_year: Filter papers by minimum year
         - max_year: Filter papers by maximum year
         - min_citations: Filter papers by minimum citations
-        - min_similarity: Filter edges by minimum relevance (0.0-1.0)
+        - min_relevance: Filter edges by minimum relevance (0.0-1.0)
 
     Returns:
         JSON with nodes and edges in React Flow format
@@ -87,7 +87,7 @@ def get_graph(paper_id: str):
         min_year=request.args.get("min_year", type=int),
         max_year=request.args.get("max_year", type=int),
         min_citations=request.args.get("min_citations", type=int),
-        min_relevance=request.args.get("min_similarity", type=float),
+        min_relevance=request.args.get("min_relevance", type=float),
     )
 
     graph_service = get_graph_service()
