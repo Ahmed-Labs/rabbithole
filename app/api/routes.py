@@ -2,8 +2,8 @@ from celery.result import AsyncResult
 from flask import current_app, jsonify, request
 
 from app.api import bp
-from app.api.formatters import ReactFlowFormatter
-from app.api.graph_service import GraphFilters
+from app.services.graph_formatting import ReactFlowFormatter
+from app.services.graph_query import GraphFilters
 from app.services.relevance_tasks import get_relevance_task
 from paper_retrieval.paper_metadata import search
 
@@ -87,7 +87,7 @@ def get_graph(paper_id: str):
         min_year=request.args.get("min_year", type=int),
         max_year=request.args.get("max_year", type=int),
         min_citations=request.args.get("min_citations", type=int),
-        min_similarity=request.args.get("min_similarity", type=float),
+        min_relevance=request.args.get("min_similarity", type=float),
     )
 
     graph_service = get_graph_service()
@@ -101,11 +101,5 @@ def get_graph(paper_id: str):
     graph_data = ReactFlowFormatter.format_graph(
         papers, relevance_edges, citation_edges, root_id=paper_id
     )
-
-    graph_data["stats"] = {
-        "total_papers": len(papers),
-        "total_citations": len(citation_edges),
-        "total_relevance_scores": len(relevance_edges),
-    }
 
     return jsonify(graph_data)

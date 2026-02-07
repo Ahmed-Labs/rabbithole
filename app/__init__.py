@@ -2,8 +2,8 @@ from celery import Celery, Task
 from flask import Flask
 
 from app.api import bp as api_bp
-from app.api.graph_service import GraphQueryService
 from app.main import bp as main_bp
+from app.services.graph_query import GraphQueryService
 from db import KnowledgeGraphReader, Neo4jClient, Neo4jConfig
 
 

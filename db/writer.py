@@ -10,10 +10,12 @@ class KnowledgeGraphWriter:
         self.client = client
 
     def ensure_schema(self) -> None:
-        self.client.run_write("""
+        self.client.run_write(
+            """
             CREATE CONSTRAINT paper_id_unique IF NOT EXISTS
             FOR (p:Paper) REQUIRE p.id IS UNIQUE
-            """)
+            """
+        )
 
     def upsert_papers(self, papers: Iterable[ResearchPaper]) -> None:
         rows = [{"id": p.id, "props": p.to_props()} for p in papers]
