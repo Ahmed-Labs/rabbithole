@@ -1,7 +1,9 @@
 from celery.result import AsyncResult
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 
 from app.api import bp
+from app.services.graph_formatting import ReactFlowFormatter
+from app.services.graph_query import GraphFilters
 from app.services.relevance_tasks import get_relevance_task
 from paper_retrieval.paper_metadata import search
 
@@ -60,3 +62,44 @@ def task_status(task_id: str):
         response["error"] = str(result.info)
 
     return jsonify(response)
+
+
+def get_graph_service():
+    """Get graph service from app extensions."""
+    return current_app.extensions["graph_service"]
+
+
+@bp.route("/graph/<paper_id>", methods=["GET"])
+def get_graph(paper_id: str):
+    """
+    Get knowledge graph for React Flow visualization.
+
+    Query params:
+        - min_year: Filter papers by minimum year
+        - max_year: Filter papers by maximum year
+        - min_citations: Filter papers by minimum citations
+        - min_relevance: Filter edges by minimum relevance (0.0-1.0)
+
+    Returns:
+        JSON with nodes and edges in React Flow format
+    """
+    filters = GraphFilters(
+        min_year=request.args.get("min_year", type=int),
+        max_year=request.args.get("max_year", type=int),
+        min_citations=request.args.get("min_citations", type=int),
+        min_relevance=request.args.get("min_relevance", type=float),
+    )
+
+    graph_service = get_graph_service()
+    papers, relevance_edges, citation_edges = graph_service.get_filtered_graph(
+        paper_id, filters
+    )
+
+    if not papers:
+        return jsonify({"error": "Paper not found"}), 404
+
+    graph_data = ReactFlowFormatter.format_graph(
+        papers, relevance_edges, citation_edges, root_id=paper_id
+    )
+
+    return jsonify(graph_data)

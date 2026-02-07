@@ -31,6 +31,19 @@ class RelevanceScore:
 
         return existing_score
 
+    def to_props(self):
+        props = {
+            "relevance_score": self.combined,
+            "semantic_similarity": self.semantic_similarity,
+            "year_similarity": self.year_similarity,
+            "citation_score": self.citation_score,
+        }
+
+        if self.llm_score:
+            props["llm_score"] = self.llm_score
+
+        return props
+
 
 @dataclass(frozen=True)
 class RelevanceEdge:
@@ -38,6 +51,12 @@ class RelevanceEdge:
     dest_id: str
     relevance_score: RelevanceScore
     llm_explanation: Optional[str] = None
+
+    def to_props(self):
+        props = self.relevance_score.to_props()
+        if self.llm_explanation:
+            props["llm_explanation"] = self.llm_explanation
+        return props
 
 
 @dataclass(frozen=True)

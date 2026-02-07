@@ -39,7 +39,7 @@ class KnowledgeGraphReader:
 
     def read(
         self, paper_id: str
-    ) -> Tuple[list[ResearchPaper], list[RelevanceEdge], list[CitationEdge]]:
+    ) -> Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]:
         cypher = """
         MATCH (root:Paper {id: $id})
 
@@ -70,6 +70,8 @@ class KnowledgeGraphReader:
         edges: list[dict] = data.get("edges", [])
 
         papers = [ResearchPaper.from_props(p) for p in nodes]
+        papers_by_id = {paper.id: paper for paper in papers}
+
         relevance_edges, citation_edges = [], []
 
         for edge in edges:
@@ -79,4 +81,4 @@ class KnowledgeGraphReader:
             elif edge_type == "CITES":
                 citation_edges.append(self._parse_citation_edge(edge))
 
-        return papers, relevance_edges, citation_edges
+        return papers_by_id, relevance_edges, citation_edges
