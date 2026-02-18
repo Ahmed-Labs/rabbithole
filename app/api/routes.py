@@ -1,3 +1,5 @@
+import traceback
+
 from celery.result import AsyncResult
 from flask import current_app, jsonify, request
 

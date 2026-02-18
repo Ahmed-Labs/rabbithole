@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+:root {
+  --color-page-bg: #090d14;
+  --color-panel-bg: #141e2d;
+  --color-card-bg: #182436;
+  --color-input-bg: #0d1b2a;
+  --color-input-bg-dark: #101723;
+  --color-content-bg: #1b2838;
+  --color-border-accent: #3621f6;
+  --color-border-default: rgb(63 63 70); /* zinc-700 */
+  --color-text: #fff;
+  --color-text-muted: rgb(161 161 170); /* zinc-400 */
+  --color-text-secondary: rgb(212 212 216); /* zinc-300 */
+  --color-placeholder: rgb(113 113 122); /* zinc-500 */
+  --color-focus: rgb(99 102 241); /* indigo-500 */
+  --color-primary: rgb(249 115 22); /* orange-500 */
+  --color-primary-hover: rgb(251 146 60); /* orange-400 */
+  --color-danger: rgb(239 68 68); /* red-500 */
+}
+
 body {
   font-family:
     system-ui,
