@@ -137,9 +137,9 @@ class Embedder:
 
             visited.add(paper.id)
 
-            self.embed(root_paper.meta, root_paper.id + META_TAG)
+            self.embed(paper.meta, paper.id + META_TAG)
             self.lazy_embed_chunks(
-                lambda: root_paper.full_text_chunks, root_paper.id + TEXT_TAG
+                lambda: paper.full_text_chunks, paper.id + TEXT_TAG
             )
 
             adjacent_papers = paper.references + paper.citations
