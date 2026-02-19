@@ -1,11 +1,14 @@
+import { memo } from "react";
 import {
   ReactFlow,
   Background,
   MiniMap,
   Panel,
   useReactFlow,
+  Handle,
+  Position,
 } from "@xyflow/react";
-import type { Node, Edge } from "@xyflow/react";
+import type { Node, Edge, NodeTypes } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { AnalysisOptions } from "../components/PaperPreview";
 import rabbitLogo from "../assets/rabbit-logo.png";
@@ -15,16 +18,15 @@ interface FlowPageProps {
   onBack: () => void;
 }
 
-const nodeStyle = {
-  background: "var(--color-card-bg)",
-  color: "var(--color-text)",
-  border: "2px solid var(--color-border-accent)",
-  borderRadius: 8,
-  maxWidth: 200,
-  whiteSpace: "normal" as const,
-  textAlign: "center" as const,
-  fontSize: 12,
-};
+const PaperNode = memo(({ data }: { data: { label: string } }) => (
+  <div className="px-3 py-2 rounded border border-zinc-600 bg-[var(--color-card-bg)] text-white text-xs w-40">
+    <Handle type="target" position={Position.Top} />
+    {data.label}
+    <Handle type="source" position={Position.Bottom} />
+  </div>
+));
+
+const nodeTypes: NodeTypes = { paper: PaperNode };
 
 function buildInitialGraph(options: AnalysisOptions): {
   nodes: Node[];
@@ -35,6 +37,7 @@ function buildInitialGraph(options: AnalysisOptions): {
   const nodes: Node[] = [
     {
       id: "root",
+      type: "paper",
       position: { x: 400, y: 0 },
       data: {
         label:
@@ -42,7 +45,6 @@ function buildInitialGraph(options: AnalysisOptions): {
             ? paper.title.slice(0, 40) + "…"
             : paper.title,
       },
-      style: nodeStyle,
     },
   ];
   const edges: Edge[] = [];
@@ -58,9 +60,9 @@ function buildInitialGraph(options: AnalysisOptions): {
 
       nodes.push({
         id: nodeId,
+        type: "paper",
         position: { x: xSpacing * (i + 1) - 40, y: depth * 160 },
         data: { label: `Paper ${depth}-${i + 1}` },
-        style: nodeStyle,
       });
 
       edges.push({
@@ -131,7 +133,7 @@ export function FlowPage({ analysisOptions, onBack }: FlowPageProps) {
       <FlowHeader onBack={onBack} />
 
       <div className="flex-1 min-h-0 m-6 rounded-lg overflow-hidden bg-[var(--color-input-bg-dark)] flex flex-col">
-        <ReactFlow nodes={nodes} edges={edges} fitView>
+        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView>
           <Background color="var(--color-border-default)" gap={20} />
           <FlowControls />
           <MiniMap
