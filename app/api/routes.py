@@ -4,9 +4,9 @@ from celery.result import AsyncResult
 from flask import current_app, jsonify, request
 
 from app.api import bp
+from app.services.embedding_task import generate_embeddings_task
 from app.services.graph_formatting import ReactFlowFormatter
 from app.services.graph_query import GraphFilters
-from app.services.embedding_task import generate_embeddings_task
 from paper_retrieval.paper_metadata import search
 
 

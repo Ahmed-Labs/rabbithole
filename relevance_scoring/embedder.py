@@ -5,10 +5,9 @@ import numpy as np
 import torch
 from adapters import AutoAdapterModel
 from transformers import AutoTokenizer
+
 from paper_retrieval import ResearchPaper
 from relevance_scoring.constants import *
-
-
 from relevance_scoring.embedding_cache import EmbeddingStore
 
 
