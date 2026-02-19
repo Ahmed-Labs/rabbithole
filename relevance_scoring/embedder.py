@@ -1,13 +1,14 @@
 import time
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Iterable, List, Optional, Set
 
 import numpy as np
 import torch
 from adapters import AutoAdapterModel
-from sklearn.metrics.pairwise import cosine_similarity
 from transformers import AutoTokenizer
 
-from relevance_scoring.embedding_cache import EmbeddingCache
+from paper_retrieval import ResearchPaper
+from relevance_scoring.constants import *
+from relevance_scoring.embedding_cache import EmbeddingStore
 
 
 class Embedder:
@@ -26,7 +27,7 @@ class Embedder:
         self.model.load_adapter(adapter_name, source="hf", set_active=True)
 
         self.model_name = f"{base_model}+{adapter_name}"
-        self.cache = EmbeddingCache(cache_dir)
+        self.store = EmbeddingStore(cache_dir)
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.batch_size = batch_size
@@ -72,7 +73,7 @@ class Embedder:
 
     def embed(self, text: str, cache_key: Optional[str] = None) -> np.ndarray:
         if cache_key:
-            cached = self.cache.get(cache_key)
+            cached = self.store.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -83,7 +84,7 @@ class Embedder:
         self, chunks: List[str], cache_key: Optional[str] = None
     ) -> np.ndarray:
         if cache_key:
-            cached = self.cache.get(cache_key)
+            cached = self.store.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -105,7 +106,7 @@ class Embedder:
         result = pooled.float().cpu().numpy()
 
         if cache_key:
-            self.cache.set(cache_key, result)
+            self.store.set(cache_key, result)
 
         return result
 
@@ -115,20 +116,34 @@ class Embedder:
         cache_key: Optional[str] = None,
     ) -> np.ndarray:
         if cache_key:
-            cached = self.cache.get(cache_key)
+            cached = self.store.get(cache_key)
             if cached is not None:
                 return cached
 
         return self.embed_chunks(get_chunks(), cache_key)
 
-    def compute_similarity(
-        self, embedding1: np.ndarray, embedding2: np.ndarray
-    ) -> float:
-        return float(
-            cosine_similarity(
-                embedding1.reshape(1, -1),
-                embedding2.reshape(1, -1),
-            )[
-                0
-            ][0]
-        )
+    def embed_citation_graph(
+        self,
+        root_paper: ResearchPaper,
+    ):
+        """
+        Recursively embed all papers in reference starting from root paper.
+        """
+        visited: Set[str] = set()
+
+        def dfs(paper: ResearchPaper):
+            if paper.id in visited:
+                return
+
+            visited.add(paper.id)
+
+            self.embed(paper.meta, paper.id + META_TAG)
+            self.lazy_embed_chunks(
+                lambda: paper.full_text_chunks, paper.id + TEXT_TAG
+            )
+
+            adjacent_papers = paper.references + paper.citations
+            for adj in adjacent_papers:
+                dfs(adj)
+
+        dfs(root_paper)

@@ -67,7 +67,7 @@ class KnowledgeGraphWriter:
         )
 
     def persist_knowledge_graph(
-        self, root: ResearchPaper, relevance_edges: Iterable[RelevanceEdge]
+        self, root: ResearchPaper, relevance_edges: Iterable[RelevanceEdge] = None
     ) -> None:
         seen: set[str] = set()
         stack: List[ResearchPaper] = [root]
@@ -91,4 +91,5 @@ class KnowledgeGraphWriter:
         if cite_edges:
             self.upsert_citation_edges(cite_edges)
 
-        self.upsert_relevance_edges(relevance_edges)
+        if relevance_edges:
+            self.upsert_relevance_edges(relevance_edges)
