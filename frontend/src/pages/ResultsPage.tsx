@@ -2,15 +2,20 @@ import { useState, useEffect, useRef } from "react";
 import rabbitLogo from "../assets/rabbit-logo.png";
 import type { Paper } from "../types/Paper";
 import { PaperCard } from "../components/PaperCard";
-import { PaperPreview } from "../components/PaperPreview";
+import { PaperPreview, type AnalysisOptions } from "../components/PaperPreview";
 import "./ResultsPage.css";
 
 interface ResultsPageProps {
   searchQuery: string;
   onNewSearch: () => void;
+  onAnalyze: (options: AnalysisOptions) => void;
 }
 
-export function ResultsPage({ searchQuery, onNewSearch }: ResultsPageProps) {
+export function ResultsPage({
+  searchQuery,
+  onNewSearch,
+  onAnalyze,
+}: ResultsPageProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
@@ -146,11 +151,8 @@ export function ResultsPage({ searchQuery, onNewSearch }: ResultsPageProps) {
         </aside>
 
         <section className="results__preview-section">
-          <div
-            ref={previewScrollRef}
-            className="results__preview-scroll"
-          >
-            <PaperPreview paper={selectedPaper} />
+          <div ref={previewScrollRef} className="results__preview-scroll">
+            <PaperPreview paper={selectedPaper} onAnalyze={onAnalyze} />
           </div>
         </section>
       </main>

@@ -2,21 +2,30 @@ import { useState } from "react";
 import type { Paper } from "../types/Paper";
 import "./PaperPreview.css";
 
-interface PaperPreviewProps {
-  paper: Paper | null;
+export interface AnalysisOptions {
+  paper: Paper;
+  referenceDepth: number;
+  includeCitations: boolean;
 }
 
-export function PaperPreview({ paper }: PaperPreviewProps) {
+interface PaperPreviewProps {
+  paper: Paper | null;
+  onAnalyze: (options: AnalysisOptions) => void;
+}
+
+export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
   const [referenceDepth, setReferenceDepth] = useState(2);
   const [includeCitations, setIncludeCitations] = useState(false);
 
   if (!paper) {
     return (
-      <div className="paper-preview__empty">
-        Select a paper to view details
-      </div>
+      <div className="paper-preview__empty">Select a paper to view details</div>
     );
   }
+
+  const handleAnalyze = () => {
+    onAnalyze({ paper, referenceDepth, includeCitations });
+  };
 
   return (
     <div className="paper-preview">
@@ -70,7 +79,11 @@ export function PaperPreview({ paper }: PaperPreviewProps) {
           </div>
         </div>
         <div className="paper-preview__analyze-wrap">
-          <button type="button" className="paper-preview__analyze-btn">
+          <button
+            type="button"
+            className="paper-preview__analyze-btn"
+            onClick={handleAnalyze}
+          >
             Analyze
           </button>
         </div>
