@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 
 
-class EmbeddingCache:
+class EmbeddingStore:
     """Simple file-based cache for paper embeddings."""
 
     def __init__(self, cache_dir: str = ".embedding_cache"):

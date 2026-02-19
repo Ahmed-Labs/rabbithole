@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import List, Optional, Set, Tuple
+from typing import Optional
 
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 from paper_retrieval import ResearchPaper
 from relevance_scoring.constants import *
@@ -107,26 +108,39 @@ class RelevanceScorer:
         # Score: 0.5 at 100 citations, ~0.7 at 1000 citations
         return min(0.5 + np.log10(paper.citation_count + 1) / 6, 1.0)
 
+    def _cosine_similarity(
+        self, embedding1: np.ndarray, embedding2: np.ndarray
+    ) -> float:
+        return float(
+            cosine_similarity(
+                embedding1.reshape(1, -1),
+                embedding2.reshape(1, -1),
+            )[
+                0
+            ][0]
+        )
+
     def _compute_semantic_similarity(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
     ) -> float:
-        root_embs = self.embedder.lazy_embed_chunks(
-            lambda: root_paper.full_text_chunks, cache_key=root_paper.id + ":text"
-        )
-        target_embs = self.embedder.lazy_embed_chunks(
-            lambda: target_paper.full_text_chunks, cache_key=target_paper.id + ":text"
-        )
+        # Full text similarity
+        root_text = self.embedder.store.get(root_paper.id + TEXT_TAG)
+        target_text = self.embedder.store.get(target_paper.id + TEXT_TAG)
 
-        full_text_sim = self.embedder.compute_similarity(root_embs, target_embs)
+        # Title + abstract embeddings
+        root_meta = self.embedder.store.get(root_paper.id + META_TAG)
+        target_meta = self.embedder.store.get(target_paper.id + META_TAG)
 
-        root_meta_emb = self.embedder.embed(root_paper.meta, root_paper.id + ":meta")
-        target_meta_emb = self.embedder.embed(
-            target_paper.meta, target_paper.id + ":meta"
-        )
-        meta_sim = self.embedder.compute_similarity(root_meta_emb, target_meta_emb)
-        return 0.8 * full_text_sim + 0.2 * meta_sim
+        for embedding in [root_text, target_text, root_meta, target_meta]:
+            if embedding is None:
+                return 0
 
-    def compute_score(
+        text_sim = self._cosine_similarity(root_text, target_text)
+        meta_sim = self._cosine_similarity(root_meta, target_meta)
+
+        return TEXT_SEMANTIC_WEIGHT * text_sim + META_SEMANTIC_WEIGHT * meta_sim
+
+    def compute_relevance_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
     ) -> tuple[Optional[RelevanceScore], Optional[str]]:
         relevance_score = RelevanceScore(
@@ -147,52 +161,3 @@ class RelevanceScorer:
             return relevance_score, llm_description
 
         return relevance_score, None
-
-    def compute_relevance_edges(
-        self,
-        root_paper: ResearchPaper,
-    ) -> List[RelevanceEdge]:
-        """
-        Recursively score all papers in reference tree against root paper.
-        """
-        edges: List[RelevanceEdge] = []
-
-        visited: Set[str] = set()
-        scored: Set[str] = set()
-
-        def dfs(paper: ResearchPaper):
-            if paper.id in visited:
-                return
-            visited.add(paper.id)
-
-            adjacent_papers = paper.references + paper.citations
-
-            for adj in adjacent_papers:
-                if adj.id not in scored:
-                    score, llm_description = self.compute_score(root_paper, adj)
-                    if score:
-                        edges.append(
-                            RelevanceEdge(
-                                src_id=root_paper.id,
-                                dest_id=adj.id,
-                                relevance_score=score,
-                                llm_explanation=llm_description,
-                            )
-                        )
-                    scored.add(adj.id)
-
-                dfs(adj)
-
-        dfs(root_paper)
-        return edges
-
-
-def compute_relevance_scores(root_paper) -> Tuple[List[RelevanceEdge]]:
-    scorer = RelevanceScorer()
-
-    print("\nComputing relevance scores...")
-    edges = scorer.compute_relevance_edges(root_paper)
-
-    edges.sort(key=lambda x: x.relevance_score.combined, reverse=True)
-
-    return edges

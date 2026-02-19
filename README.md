@@ -50,7 +50,7 @@ black .
 **1. Submit a task** (Windows PowerShell):
 ```powershell
 $response = Invoke-RestMethod `
-  -Uri http://localhost:5000/api/get-relevance `
+  -Uri http://localhost:5000/api/embed `
   -Method POST `
   -Headers @{ "Content-Type" = "application/json" } `
   -Body '{"query":"phasor","max_depth":1,"max_references":10}'

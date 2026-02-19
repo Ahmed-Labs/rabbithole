@@ -6,7 +6,7 @@ from flask import current_app, jsonify, request
 from app.api import bp
 from app.services.graph_formatting import ReactFlowFormatter
 from app.services.graph_query import GraphFilters
-from app.services.relevance_tasks import get_relevance_task
+from app.services.embedding_task import generate_embeddings_task
 from paper_retrieval.paper_metadata import search
 
 
@@ -29,7 +29,7 @@ def search_papers():
     return jsonify({"papers": papers_data})
 
 
-@bp.route("/get-relevance", methods=["POST"])
+@bp.route("/embed", methods=["POST"])
 def get_relevance():
     data = request.get_json(silent=True) or {}
 
@@ -40,7 +40,7 @@ def get_relevance():
     max_depth = int(data.get("max_depth", 1))
     max_references = int(data.get("max_references", 10))
 
-    task = get_relevance_task.delay(
+    task = generate_embeddings_task.delay(
         query=query,
         max_depth=max_depth,
         max_references=max_references,

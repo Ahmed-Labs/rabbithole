@@ -2,11 +2,11 @@ from celery import shared_task
 
 from db import KnowledgeGraphWriter, Neo4jClient, Neo4jConfig
 from paper_retrieval.paper_metadata import build_citation_graph, search
-from relevance_scoring.relevance_scorer import compute_relevance_scores
+from relevance_scoring.embedder import Embedder
 
 
 @shared_task(bind=True)
-def get_relevance_task(
+def generate_embeddings_task(
     self,
     query: str,
     max_depth: int = 1,
@@ -25,17 +25,18 @@ def get_relevance_task(
         include_citations=True,
     )
 
-    edges = compute_relevance_scores(root_paper)
+    embedder = Embedder()
+    embedder.embed_citation_graph(root_paper)
 
     cfg = Neo4jConfig.from_env()
     with Neo4jClient(cfg) as client:
         writer = KnowledgeGraphWriter(client)
         writer.ensure_schema()
-        writer.persist_knowledge_graph(root_paper, edges)
+        writer.persist_knowledge_graph(root_paper)
 
     return {
         "status": "success",
         "query": query,
-        "root_paper": root_paper.title,
-        "papers_processed": len(edges),
+        "root_paper": root_paper.id,
+        "root_paper_title": root_paper.title,
     }

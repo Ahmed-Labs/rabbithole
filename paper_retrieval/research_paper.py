@@ -84,7 +84,10 @@ class ResearchPaper:
             "pdf_url": self.pdf_url,
             "year": self.year,
             "citation_count": self.citation_count,
-            "authors": self.authors,
+            "authors": [
+                json.dumps(a) if isinstance(a, dict) else a
+                for a in (self.authors or [])
+            ],
         }
 
     @classmethod
