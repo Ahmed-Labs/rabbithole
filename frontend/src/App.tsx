@@ -38,11 +38,8 @@ function App() {
           onAnalyze={handleAnalyze}
         />
       )}
-      {currentView === "flow" && analysisOptions && (
-        <FlowPage
-          analysisOptions={analysisOptions}
-          onBack={() => setCurrentView("results")}
-        />
+      {currentView === "flow" && (
+        <FlowPage onBack={() => setCurrentView("results")} />
       )}
     </>
   );
