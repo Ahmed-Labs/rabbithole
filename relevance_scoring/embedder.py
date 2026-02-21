@@ -127,7 +127,7 @@ class Embedder:
         root_paper: ResearchPaper,
     ):
         """
-        Recursively embed all papers in reference starting from root paper.
+        Recursively embed all papers in citation graph starting from root paper.
         """
         visited: Set[str] = set()
 
