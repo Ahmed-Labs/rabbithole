@@ -78,6 +78,7 @@ def get_relevance_scorer() -> RelevanceScorer:
     """Get relevance scorer from app extensions."""
     return current_app.extensions["relevance_scorer"]
 
+
 def get_graph_writer() -> KnowledgeGraphWriter:
     return current_app.extensions["graph_writer"]
 
