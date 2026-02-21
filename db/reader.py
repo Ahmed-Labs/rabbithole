@@ -15,23 +15,23 @@ class KnowledgeGraphReader:
     def __init__(self, client: Neo4jClient):
         self.client = client
 
-    def _parse_relevance_edge(self, edge: dict) -> list[RelevanceEdge]:
+    def _parse_relevance_edge(self, edge: dict) -> RelevanceEdge:
         relevance_score_data: Props = edge.get("props", {})
         score = RelevanceScore(
             semantic_similarity=relevance_score_data.get("semantic_similarity"),
             year_similarity=relevance_score_data.get("year_similarity"),
             citation_score=relevance_score_data.get("citation_score"),
-            llm_score=relevance_score_data.get("llm_score"),
+            llm_score=relevance_score_data.get("llm_score", None),
+            llm_explanation=relevance_score_data.get("llm_explanation", None),
         )
 
         return RelevanceEdge(
             src_id=edge.get("src"),
             dest_id=edge.get("dest"),
             relevance_score=score,
-            llm_explanation=edge.get("llm_explanation"),
         )
 
-    def _parse_citation_edge(self, edge: dict) -> list[CitationEdge]:
+    def _parse_citation_edge(self, edge: dict) -> CitationEdge:
         return CitationEdge(
             src_id=edge.get("src"),
             dest_id=edge.get("dest"),

@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 
 from paper_retrieval import ResearchPaper
 from relevance_scoring.constants import *
-from relevance_scoring.embedding_cache import EmbeddingStore
+from relevance_scoring.embedding_store import EmbeddingStore
 
 
 class Embedder:
@@ -138,9 +138,7 @@ class Embedder:
             visited.add(paper.id)
 
             self.embed(paper.meta, paper.id + META_TAG)
-            self.lazy_embed_chunks(
-                lambda: paper.full_text_chunks, paper.id + TEXT_TAG
-            )
+            self.lazy_embed_chunks(lambda: paper.full_text_chunks, paper.id + TEXT_TAG)
 
             adjacent_papers = paper.references + paper.citations
             for adj in adjacent_papers:

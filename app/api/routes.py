@@ -6,8 +6,11 @@ from flask import current_app, jsonify, request
 from app.api import bp
 from app.services.embedding_task import generate_embeddings_task
 from app.services.graph_formatting import ReactFlowFormatter
-from app.services.graph_query import GraphFilters
+from app.services.graph_query import GraphFilters, GraphQueryService
+from db import KnowledgeGraphWriter
 from paper_retrieval.paper_metadata import search
+from relevance_scoring.llm_scorer import LLMScorer
+from relevance_scoring.relevance_scorer import RelevanceEdge, RelevanceScorer
 
 
 @bp.route("/health")
@@ -66,9 +69,17 @@ def task_status(task_id: str):
     return jsonify(response)
 
 
-def get_graph_service():
+def get_graph_service() -> GraphQueryService:
     """Get graph service from app extensions."""
     return current_app.extensions["graph_service"]
+
+
+def get_relevance_scorer() -> RelevanceScorer:
+    """Get relevance scorer from app extensions."""
+    return current_app.extensions["relevance_scorer"]
+
+def get_graph_writer() -> KnowledgeGraphWriter:
+    return current_app.extensions["graph_writer"]
 
 
 @bp.route("/graph/<paper_id>", methods=["GET"])
@@ -97,8 +108,43 @@ def get_graph(paper_id: str):
         paper_id, filters
     )
 
-    if not papers:
+    if not papers or paper_id not in papers:
         return jsonify({"error": "Paper not found"}), 404
+
+    connected_pids = [pid for pid in papers.keys() if pid != paper_id]
+    relevance_pairs = [(r.src_id, r.dest_id) for r in relevance_edges]
+
+    # Generate missing relevance scores from embeddings
+    relevance_scorer = get_relevance_scorer()
+    new_relevance_edges: list[RelevanceEdge] = []
+    llm_task_batch = []  # TODO add celery task for llm score generation
+
+    for pid in connected_pids:
+        if (paper_id, pid) in relevance_pairs or (pid, paper_id) in relevance_pairs:
+            continue
+
+        p1, p2 = papers.get(paper_id, None), papers.get(pid, None)
+        if p1 is None or p2 is None:
+            continue
+
+        score = relevance_scorer.compute_relevance_score(p1, p2)
+        if score.semantic_similarity == 0.0:
+            continue
+
+        edge = RelevanceEdge(
+            src_id=paper_id,
+            dest_id=pid,
+            relevance_score=score,
+        )
+
+        new_relevance_edges.append(edge)
+        llm_task_batch.append((p1, p2, edge))
+
+    # Store new relevance edges and add them to response
+    if len(new_relevance_edges) > 0:
+        db = get_graph_writer()
+        db.upsert_relevance_edges(new_relevance_edges)
+        relevance_edges.extend(new_relevance_edges)
 
     graph_data = ReactFlowFormatter.format_graph(
         papers, relevance_edges, citation_edges, root_id=paper_id

@@ -43,17 +43,13 @@ class KnowledgeGraphWriter:
     def upsert_relevance_edges(self, edges: Iterable[RelevanceEdge]) -> None:
         rows: List[dict] = []
         for e in edges:
-            s = e.relevance_score
-            props = {
-                "semantic_similarity": s.semantic_similarity,
-                "year_similarity": s.year_similarity,
-                "citation_score": s.citation_score,
-                "llm_score": s.llm_score,
-            }
-            if e.llm_explanation is not None:
-                props["llm_explanation"] = e.llm_explanation
-
-            rows.append({"src": e.src_id, "dst": e.dest_id, "props": props})
+            rows.append(
+                {
+                    "src": e.src_id,
+                    "dst": e.dest_id,
+                    "props": e.relevance_score.to_props(),
+                }
+            )
 
         self.client.run_write(
             """
