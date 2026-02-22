@@ -38,27 +38,31 @@ class KnowledgeGraphReader:
         )
 
     def read(
-        self, paper_id: str
+        self, paper_id: str, cite_depth: int = 3
     ) -> Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]:
-        cypher = """
-        MATCH (root:Paper {id: $id})
+        cypher = f"""
+        MATCH (root:Paper {{id: $id}})
 
-        MATCH p1 = (root)-[:CITES*1..3]-(c)
-        MATCH p2 = (root)-[:RELEVANT_TO]-(r)
+        OPTIONAL MATCH p1 = (root)-[:CITES*1..{cite_depth}]-(c)
+        OPTIONAL MATCH p2 = (root)-[:RELEVANT_TO]-(r)
 
-        WITH collect(p1) + collect(p2) AS ps
+        WITH
+        [p IN collect(p1) WHERE p IS NOT NULL] +
+        [p IN collect(p2) WHERE p IS NOT NULL] AS ps,
+        root
+
         RETURN
-          [n IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | nodes(p)]))
-            | n {.*, id: n.id }
-          ] AS nodes,
-          [e IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)]))
-            | {
+        [n IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | nodes(p)]) + [root])
+            | n {{.*, id: n.id }}
+        ] AS nodes,
+        [e IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)]))
+            | {{
                 type: type(e),
                 src: startNode(e).id,
                 dest: endNode(e).id,
                 props: properties(e)
-              }
-          ] AS edges
+            }}
+        ] AS edges
         """
 
         rows = self.client.run_read(cypher, {"id": paper_id})
