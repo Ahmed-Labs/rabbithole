@@ -15,50 +15,54 @@ class KnowledgeGraphReader:
     def __init__(self, client: Neo4jClient):
         self.client = client
 
-    def _parse_relevance_edge(self, edge: dict) -> list[RelevanceEdge]:
+    def _parse_relevance_edge(self, edge: dict) -> RelevanceEdge:
         relevance_score_data: Props = edge.get("props", {})
         score = RelevanceScore(
             semantic_similarity=relevance_score_data.get("semantic_similarity"),
             year_similarity=relevance_score_data.get("year_similarity"),
             citation_score=relevance_score_data.get("citation_score"),
-            llm_score=relevance_score_data.get("llm_score"),
+            llm_score=relevance_score_data.get("llm_score", None),
+            llm_explanation=relevance_score_data.get("llm_explanation", None),
         )
 
         return RelevanceEdge(
             src_id=edge.get("src"),
             dest_id=edge.get("dest"),
             relevance_score=score,
-            llm_explanation=edge.get("llm_explanation"),
         )
 
-    def _parse_citation_edge(self, edge: dict) -> list[CitationEdge]:
+    def _parse_citation_edge(self, edge: dict) -> CitationEdge:
         return CitationEdge(
             src_id=edge.get("src"),
             dest_id=edge.get("dest"),
         )
 
     def read(
-        self, paper_id: str
+        self, paper_id: str, cite_depth: int = 3
     ) -> Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]:
-        cypher = """
-        MATCH (root:Paper {id: $id})
+        cypher = f"""
+        MATCH (root:Paper {{id: $id}})
 
-        MATCH p1 = (root)-[:CITES*1..3]-(c)
-        MATCH p2 = (root)-[:RELEVANT_TO]-(r)
+        OPTIONAL MATCH p1 = (root)-[:CITES*1..{cite_depth}]-(c)
+        OPTIONAL MATCH p2 = (root)-[:RELEVANT_TO]-(r)
 
-        WITH collect(p1) + collect(p2) AS ps
+        WITH
+        [p IN collect(p1) WHERE p IS NOT NULL] +
+        [p IN collect(p2) WHERE p IS NOT NULL] AS ps,
+        root
+
         RETURN
-          [n IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | nodes(p)]))
-            | n {.*, id: n.id }
-          ] AS nodes,
-          [e IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)]))
-            | {
+        [n IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | nodes(p)]) + [root])
+            | n {{.*, id: n.id }}
+        ] AS nodes,
+        [e IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)]))
+            | {{
                 type: type(e),
                 src: startNode(e).id,
                 dest: endNode(e).id,
                 props: properties(e)
-              }
-          ] AS edges
+            }}
+        ] AS edges
         """
 
         rows = self.client.run_read(cypher, {"id": paper_id})

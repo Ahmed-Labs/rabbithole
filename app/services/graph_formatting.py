@@ -1,7 +1,11 @@
 from typing import Any, Dict, List, Optional
 
 from paper_retrieval.research_paper import ResearchPaper
-from relevance_scoring.relevance_scorer import CitationEdge, RelevanceEdge
+from relevance_scoring.relevance_scorer import (
+    CitationEdge,
+    RelevanceEdge,
+    RelevanceScore,
+)
 
 
 class ReactFlowFormatter:
@@ -15,13 +19,13 @@ class ReactFlowFormatter:
         root_id: str,
     ) -> Dict[str, Any]:
         paper_scores = {
-            (e.dest_id if e.src_id == root_id else e.src_id): e.relevance_score.combined
+            (e.dest_id if e.src_id == root_id else e.src_id): e.relevance_score
             for e in relevance_edges
         }
 
         nodes = [
             ReactFlowFormatter._build_node(
-                p, paper_scores.get(p.id, 0.0), p.id == root_id
+                p, paper_scores.get(p.id, RelevanceScore(0, 0, 0)), p.id == root_id
             )
             for p in papers.values()
         ]
@@ -36,14 +40,15 @@ class ReactFlowFormatter:
 
     @staticmethod
     def _build_node(
-        paper: ResearchPaper, relevance_score: float, is_root: bool
+        paper: ResearchPaper, relevance_score: RelevanceScore, is_root: bool
     ) -> Dict[str, Any]:
         return {
             "id": paper.id,
             "type": "paperNode",
             "data": {
                 **paper.to_props(),
-                "relevance_score": relevance_score,
+                "relevance_score": relevance_score.combined,
+                "llm_explanation": relevance_score.llm_explanation,
                 "is_root": is_root,
             },
             "position": {"x": 0, "y": 0},

@@ -7,7 +7,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from paper_retrieval import ResearchPaper
 from relevance_scoring.constants import *
 from relevance_scoring.embedder import Embedder
-from relevance_scoring.llm_scorer import LLMScorer
 
 
 @dataclass
@@ -16,6 +15,7 @@ class RelevanceScore:
     year_similarity: float
     citation_score: float
     llm_score: Optional[float] = None
+    llm_explanation: Optional[str] = None
 
     @property
     def combined(self):
@@ -40,8 +40,9 @@ class RelevanceScore:
             "citation_score": self.citation_score,
         }
 
-        if self.llm_score:
+        if self.llm_score is not None:
             props["llm_score"] = self.llm_score
+            props["llm_explanation"] = self.llm_explanation
 
         return props
 
@@ -51,13 +52,6 @@ class RelevanceEdge:
     src_id: str
     dest_id: str
     relevance_score: RelevanceScore
-    llm_explanation: Optional[str] = None
-
-    def to_props(self):
-        props = self.relevance_score.to_props()
-        if self.llm_explanation:
-            props["llm_explanation"] = self.llm_explanation
-        return props
 
 
 @dataclass(frozen=True)
@@ -79,7 +73,6 @@ class RelevanceScorer:
 
     def __init__(self):
         self.embedder = Embedder()
-        self.llm_scorer = LLMScorer()
 
     def _compute_year_similarity(
         self, year1: Optional[int], year2: Optional[int]
@@ -121,7 +114,9 @@ class RelevanceScorer:
         )
 
     def _compute_semantic_similarity(
-        self, root_paper: ResearchPaper, target_paper: ResearchPaper
+        self,
+        root_paper: ResearchPaper,
+        target_paper: ResearchPaper,
     ) -> float:
         # Full text similarity
         root_text = self.embedder.store.get(root_paper.id + TEXT_TAG)
@@ -131,9 +126,8 @@ class RelevanceScorer:
         root_meta = self.embedder.store.get(root_paper.id + META_TAG)
         target_meta = self.embedder.store.get(target_paper.id + META_TAG)
 
-        for embedding in [root_text, target_text, root_meta, target_meta]:
-            if embedding is None:
-                return 0
+        if any(e is None for e in (root_text, target_text, root_meta, target_meta)):
+            return 0.0
 
         text_sim = self._cosine_similarity(root_text, target_text)
         meta_sim = self._cosine_similarity(root_meta, target_meta)
@@ -142,8 +136,8 @@ class RelevanceScorer:
 
     def compute_relevance_score(
         self, root_paper: ResearchPaper, target_paper: ResearchPaper
-    ) -> tuple[Optional[RelevanceScore], Optional[str]]:
-        relevance_score = RelevanceScore(
+    ) -> RelevanceScore:
+        return RelevanceScore(
             semantic_similarity=self._compute_semantic_similarity(
                 root_paper, target_paper
             ),
@@ -152,12 +146,3 @@ class RelevanceScorer:
             ),
             citation_score=self._get_citation_score(target_paper),
         )
-
-        if relevance_score.combined >= LLM_SCORING_THRESHOLD:
-            llm_score, llm_description = self.llm_scorer.compute_score(
-                root_paper, target_paper
-            )
-            relevance_score.llm_score = llm_score
-            return relevance_score, llm_description
-
-        return relevance_score, None

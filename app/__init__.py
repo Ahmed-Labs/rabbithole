@@ -5,7 +5,9 @@ from flask_cors import CORS
 from app.api import bp as api_bp
 from app.main import bp as main_bp
 from app.services.graph_query import GraphQueryService
-from db import KnowledgeGraphReader, Neo4jClient, Neo4jConfig
+from db import KnowledgeGraphReader, KnowledgeGraphWriter, Neo4jClient, Neo4jConfig
+from relevance_scoring import RelevanceScorer
+from relevance_scoring.llm_scorer import LLMScorer
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -26,10 +28,14 @@ def init_neo4j(app: Flask) -> None:
     neo4j_config = Neo4jConfig.from_env()
     neo4j_client = Neo4jClient(neo4j_config)
     reader = KnowledgeGraphReader(neo4j_client)
+    graph_writer = KnowledgeGraphWriter(neo4j_client)
     graph_service = GraphQueryService(reader)
 
     app.extensions["neo4j_client"] = neo4j_client
     app.extensions["graph_service"] = graph_service
+    app.extensions["graph_writer"] = graph_writer
+    app.extensions["relevance_scorer"] = RelevanceScorer()
+    app.extensions["llm_scorer"] = LLMScorer()
 
 
 def create_app():
