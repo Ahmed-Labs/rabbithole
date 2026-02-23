@@ -24,7 +24,9 @@ class GraphQueryService:
     def get_filtered_graph(
         self, paper_id: str, filters: GraphFilters
     ) -> Tuple[dict[str, ResearchPaper], List[RelevanceEdge], List[CitationEdge]]:
-        papers_by_id, relevance_edges, citation_edges = self.reader.read(paper_id)
+        papers_by_id, relevance_edges, citation_edges = self.reader.read(
+            paper_id, filters.max_depth
+        )
         root_paper = papers_by_id.pop(paper_id, None)
 
         if not papers_by_id or root_paper is None:
