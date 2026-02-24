@@ -1,10 +1,18 @@
+import json
 import os
-import re
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence
 
 from paper_retrieval import ResearchPaper
 from paper_retrieval import session as r
 from relevance_scoring.constants import *
+from relevance_scoring.relevance_scorer import RelevanceEdge, RelevanceScore
+
+
+@dataclass
+class LLMResult:
+    relevance_score: float
+    explanation: str
 
 
 class LLMScorer:
@@ -16,65 +24,44 @@ class LLMScorer:
             )
         self.api_key = resolved_key
 
-    def _create_prompt(
-        self, root_paper: ResearchPaper, target_paper: ResearchPaper
+    def _clip(self, s: Optional[str], max_chars: int) -> str:
+        return (s or "")[:max_chars]
+
+    def _create_batch_prompt(
+        self, root_paper: ResearchPaper, targets: Sequence[ResearchPaper]
     ) -> str:
-        """Create a prompt for the LLM to score relevance."""
-        root_text = root_paper.meta
-        taget_text = target_paper.meta
+        root_text = self._clip(root_paper.meta, 2500)
+        n = len(targets)
 
-        prompt = f"""Compare the following papers by providing a precise score from 0 to 100 indicating how relevant they are to each other and also provide a brief 1 paragraph explanation of how they are similar or different. Format the output so that the first line is just the similarity score and then on a new line output the explanation and do not say anything else. 
-        Root paper:
-        {root_text}
+        items: List[Dict[str, Any]] = []
+        for i, p in enumerate(targets):
+            items.append(
+                {
+                    "idx": i,
+                    "paper_id": getattr(p, "id", None),
+                    "title": getattr(p, "title", None),
+                    "meta": self._clip(p.meta, 1200),
+                }
+            )
 
-        Current paper:
-        {taget_text}"""
+        return (
+            "You will compare one root paper to multiple candidate papers.\n\n"
+            f"You MUST return exactly {n} results (idx 0 to {n-1}).\n"
+            "Return ONLY valid JSON. No markdown. No commentary.\n\n"
+            "Exact required format:\n"
+            '{"results":[{"idx":0,"score_0_100":0,"explanation":"..."}]}\n\n'
+            "Hard rules:\n"
+            "- Each candidate must produce exactly one result object.\n"
+            "- explanation MUST be non-empty.\n"
+            "- explanation must be 1-2 sentences.\n"
+            "- Even if score_0_100 is 0, explanation must state why they are unrelated.\n\n"
+            "Root paper:\n"
+            f"{root_text}\n\n"
+            "Candidate papers (JSON array):\n"
+            f"{json.dumps(items, ensure_ascii=False)}"
+        )
 
-        return prompt
-
-    def _parse_response(self, content: str) -> Dict[str, Any]:
-        """Parse LLM response to extract score and explanation."""
-        content = content.strip()
-
-        # Parse format: first line is score (e.g., "8.5 / 10" or "7/10"), then explanation
-        lines = content.split("\n", 1)
-
-        # Extract score from first line
-        score_match = re.search(r"(\d+(?:\.\d+)?)\s*/\s*10", lines[0])
-        if score_match:
-            score = float(score_match.group(1)) / 100.0  # Convert 1-10 to 0-1 scale
-        else:
-            # Try to find just a number
-            num_match = re.search(r"(\d+(?:\.\d+)?)", lines[0])
-            if num_match:
-                raw_score = float(num_match.group(1))
-                score = raw_score / 100.0
-            else:
-                score = 0.5
-
-        # Get explanation (everything after first line)
-        explanation = lines[1].strip() if len(lines) > 1 else ""
-
-        result = {
-            "relevance_score": max(0.0, min(1.0, score)),
-            "explanation": explanation,
-        }
-
-        return result
-
-    def compute_score(
-        self, root_paper: ResearchPaper, target_paper: ResearchPaper
-    ) -> tuple[float, str]:
-        """
-        Compute relevance score and explanation.
-
-        Returns:
-            Tuple with:
-            - "relevance_score": float (0.0 to 1.0)
-            - "explanation": str
-        """
-        prompt = self._create_prompt(root_paper, target_paper)
-
+    def _call_llm_json(self, prompt: str) -> Dict[str, Any]:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -85,26 +72,77 @@ class LLMScorer:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a research paper analysis expert. Provide clear, concise comparisons.",
+                    "content": "You are a research paper analysis expert. Output JSON only.",
                 },
                 {"role": "user", "content": prompt},
             ],
+            "response_format": {"type": "json_object"},
         }
 
-        try:
-            resp = r.post(url, headers=headers, json=payload, timeout=60)
+        resp = r.post(url, headers=headers, json=payload, timeout=120)
+
+        if resp.status_code != 200:
             resp.raise_for_status()
-            data = resp.json()
 
-            content = data["choices"][0]["message"]["content"].strip()
-            result = self._parse_response(content)
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        return json.loads(content)
 
-            # Validate and normalize score
-            score = float(result.get("relevance_score", 0.5))
-            score = max(0.0, min(1.0, score))  # Clamp to [0, 1]
+    def _parse_batch(self, data: Dict[str, Any], n: int) -> List[LLMResult]:
+        out: List[LLMResult] = [LLMResult(0.0, "") for _ in range(n)]
+        results = data.get("results", [])
 
-            return (score, result.get("explanation", ""))
+        if not isinstance(results, list):
+            print("Unexpected results:", data)
+            return out
 
-        except Exception as e:
-            print(f"LLM scoring failed: {e}")
-            return (-1, "")
+        for item in results:
+            try:
+                idx = int(item.get("idx"))
+                raw_score = item.get("score_0_100", 0)
+                score_0_100 = int(float(raw_score))
+                score_0_100 = max(0, min(100, score_0_100))
+                score = score_0_100 / 100.0
+
+                explanation = str(item.get("explanation", "")).strip()
+
+                if 0 <= idx < n:
+                    out[idx] = LLMResult(score, explanation)
+
+            except Exception as e:
+                print("Bad LLM item:", item, "err:", e)
+
+        return out
+
+    def compute_scores_batched(
+        self,
+        root_paper: ResearchPaper,
+        target_papers: List[ResearchPaper],
+        batch_size: int = LLM_BATCH_SIZE,
+    ) -> List[RelevanceEdge]:
+        edges: List[RelevanceEdge] = []
+
+        for i in range(0, len(target_papers), batch_size):
+            chunk = list(target_papers[i : i + batch_size])
+            prompt = self._create_batch_prompt(root_paper, chunk)
+
+            try:
+                data = self._call_llm_json(prompt)
+                parsed = self._parse_batch(data, n=len(chunk))
+
+                for target, result in zip(chunk, parsed):
+                    score_obj = RelevanceScore(
+                        llm_score=result.relevance_score,
+                        llm_explanation=result.explanation,
+                    )
+                    edge = RelevanceEdge(
+                        src_id=root_paper.id,
+                        dest_id=target.id,
+                        relevance_score=score_obj,
+                    )
+                    edges.append(edge)
+
+            except Exception as e:
+                print(f"LLM scoring failed: {e}")
+
+        return edges

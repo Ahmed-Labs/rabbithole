@@ -11,9 +11,9 @@ from relevance_scoring.embedder import Embedder
 
 @dataclass
 class RelevanceScore:
-    semantic_similarity: float
-    year_similarity: float
-    citation_score: float
+    semantic_similarity: float = 0.0
+    year_similarity: float = 0.0
+    citation_score: float = 0.0
     llm_score: Optional[float] = None
     llm_explanation: Optional[str] = None
 

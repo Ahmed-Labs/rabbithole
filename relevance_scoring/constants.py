@@ -13,6 +13,9 @@ GPT_MODEL = "gpt-5-nano"
 # with a relevance score above this threshold.
 LLM_SCORING_THRESHOLD = 0.8
 
+# Number of papers to batch into one LLM API call
+LLM_BATCH_SIZE = 50
+
 # Tag or suffix of the embedding key to denote its type
 # text -> Pooled paper text
 # meta -> Title + abstract of paper

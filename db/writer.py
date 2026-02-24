@@ -62,6 +62,33 @@ class KnowledgeGraphWriter:
             {"rows": rows},
         )
 
+    def upsert_llm_relevance(self, edges: Iterable[RelevanceEdge]) -> None:
+        """
+        Update only llm_score and llm_explanation on existing RELEVANT_TO edges.
+        """
+        rows: List[dict] = []
+        for e in edges:
+            rows.append(
+                {
+                    "src": e.src_id,
+                    "dst": e.dest_id,
+                    "llm_score": e.relevance_score.llm_score,
+                    "llm_explanation": e.relevance_score.llm_explanation,
+                }
+            )
+
+        self.client.run_write(
+            """
+            UNWIND $rows AS row
+            MATCH (a:Paper {id: row.src})
+            MATCH (b:Paper {id: row.dst})
+            MATCH (a)-[r:RELEVANT_TO]->(b)
+            SET r.llm_score = row.llm_score,
+                r.llm_explanation = row.llm_explanation
+            """,
+            {"rows": rows},
+        )
+
     def persist_knowledge_graph(
         self, root: ResearchPaper, relevance_edges: Iterable[RelevanceEdge] = None
     ) -> None:
