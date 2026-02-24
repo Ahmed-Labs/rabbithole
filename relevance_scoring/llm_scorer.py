@@ -30,7 +30,11 @@ class LLMScorer:
     def _create_batch_prompt(
         self, root_paper: ResearchPaper, targets: Sequence[ResearchPaper]
     ) -> str:
-        root_text = self._clip(root_paper.meta, 2500)
+        root_item = {
+            "paper_id": root_paper.id,
+            "title": root_paper.title,
+            "meta": self._clip(root_paper.meta, 2500),
+        }
         n = len(targets)
 
         items: List[Dict[str, Any]] = []
@@ -45,19 +49,20 @@ class LLMScorer:
             )
 
         return (
-            "You will compare one root paper to multiple candidate papers.\n\n"
+            "You will evaluate the relatedness between one reference paper and multiple other papers.\n\n"
             f"You MUST return exactly {n} results (idx 0 to {n-1}).\n"
             "Return ONLY valid JSON. No markdown. No commentary.\n\n"
             "Exact required format:\n"
             '{"results":[{"idx":0,"score_0_100":0,"explanation":"..."}]}\n\n'
             "Hard rules:\n"
-            "- Each candidate must produce exactly one result object.\n"
+            "- Each comparison must produce exactly one result object.\n"
             "- explanation MUST be non-empty.\n"
             "- explanation must be 1-2 sentences.\n"
+            "- explanation must begin by explicitly naming both papers using short, recognizable title phrases (abbreviate long titles if needed), then describe their relationship; do not refer to them by role.\n"
             "- Even if score_0_100 is 0, explanation must state why they are unrelated.\n\n"
-            "Root paper:\n"
-            f"{root_text}\n\n"
-            "Candidate papers (JSON array):\n"
+            "Reference paper (JSON object):\n"
+            f"{json.dumps(root_item, ensure_ascii=False)}\n\n"
+            "Other papers (JSON array):\n"
             f"{json.dumps(items, ensure_ascii=False)}"
         )
 
