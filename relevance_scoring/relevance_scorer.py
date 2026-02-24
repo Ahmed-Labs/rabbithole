@@ -66,20 +66,20 @@ class RelevanceEdge:
 
     def to_props(self):
         props = {
-            "src_id": self.src_id,
-            "dest_id": self.dest_id,
+            "src": self.src_id,
+            "dest": self.dest_id,
         }
         if self.relevance_score is not None:
-            props["relevance_score"] = self.relevance_score.to_props()
+            props["props"] = self.relevance_score.to_props()
 
         return props
 
     @classmethod
     def from_props(cls, edge: Dict[str, Any]) -> RelevanceEdge:
-        score = edge.get("relevance_score", None)
+        score = edge.get("props", None)
         return cls(
-            src_id=edge.get("src_id"),
-            dest_id=edge.get("dest_id"),
+            src_id=edge.get("src"),
+            dest_id=edge.get("dest"),
             relevance_score=(
                 RelevanceScore.from_props(score) if score is not None else None
             ),
@@ -93,15 +93,15 @@ class CitationEdge:
 
     def to_props(self):
         return {
-            "src_id": self.src_id,
-            "dest_id": self.dest_id,
+            "src": self.src_id,
+            "dest": self.dest_id,
         }
 
     @classmethod
     def from_props(cls, edge: Dict) -> CitationEdge:
         return cls(
-            src_id=edge.get("src_id"),
-            dest_id=edge.get("dest_id"),
+            src_id=edge.get("src"),
+            dest_id=edge.get("dest"),
         )
 
 

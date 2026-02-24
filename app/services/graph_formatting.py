@@ -55,16 +55,6 @@ class ReactFlowFormatter:
         }
 
     @staticmethod
-    def _build_relevance_edge(edge: RelevanceEdge) -> Dict[str, Any]:
-        return {
-            "id": f"rel-{edge.src_id}-{edge.dest_id}",
-            "source": edge.src_id,
-            "target": edge.dest_id,
-            "type": "relevanceEdge",
-            "data": edge.to_props(),
-        }
-
-    @staticmethod
     def _build_citation_edge(edge: CitationEdge) -> Dict[str, Any]:
         return {
             "id": f"cite-{edge.src_id}-{edge.dest_id}",

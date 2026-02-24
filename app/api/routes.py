@@ -140,13 +140,13 @@ def get_graph(paper_id: str):
         llm_targets.append((p2, edge))
 
     # Store new relevance edges and add them to response
-    task_data = {}
     if len(new_relevance_edges) > 0:
         db = get_graph_writer()
         db.upsert_relevance_edges(new_relevance_edges)
         relevance_edges.extend(new_relevance_edges)
 
     # Queue LLM task
+    task_data = {}
     if len(llm_targets) > 0:
         targets = [(p.to_props(), e.to_props()) for p, e in llm_targets]
         task = generate_llm_score.delay(p1.to_props(), targets)
