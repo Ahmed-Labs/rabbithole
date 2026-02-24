@@ -51,18 +51,26 @@ class KnowledgeGraphReader:
         [p IN collect(p2) WHERE p IS NOT NULL] AS ps,
         root
 
+        WITH
+        apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)])) AS rels,
+        root
+
+        WITH
+        rels,
+        apoc.coll.toSet(
+            [root] +
+            [e IN rels | startNode(e)] +
+            [e IN rels | endNode(e)]
+        ) AS ns
+
         RETURN
-        [n IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | nodes(p)]) + [root])
-            | n {{.*, id: n.id }}
-        ] AS nodes,
-        [e IN apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)]))
-            | {{
-                type: type(e),
-                src: startNode(e).id,
-                dest: endNode(e).id,
-                props: properties(e)
-            }}
-        ] AS edges
+        [n IN ns | n {{.*, id: n.id }}] AS nodes,
+        [e IN rels | {{
+            type: type(e),
+            src: startNode(e).id,
+            dest: endNode(e).id,
+            props: properties(e)
+        }}] AS edges
         """
 
         rows = self.client.run_read(cypher, {"id": paper_id})
