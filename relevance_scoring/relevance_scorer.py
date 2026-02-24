@@ -34,7 +34,6 @@ class RelevanceScore:
 
     def to_props(self):
         props = {
-            "relevance_score": self.combined,
             "semantic_similarity": self.semantic_similarity,
             "year_similarity": self.year_similarity,
             "citation_score": self.citation_score,
