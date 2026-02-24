@@ -1,12 +1,12 @@
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from paper_retrieval import ResearchPaper
 from paper_retrieval import session as r
 from relevance_scoring.constants import *
-from relevance_scoring.relevance_scorer import RelevanceEdge, RelevanceScore
+from relevance_scoring.relevance_scorer import RelevanceEdge
 
 
 @dataclass
@@ -117,29 +117,22 @@ class LLMScorer:
     def compute_scores_batched(
         self,
         root_paper: ResearchPaper,
-        target_papers: List[ResearchPaper],
+        target_papers: List[Tuple[ResearchPaper, RelevanceEdge]],
         batch_size: int = LLM_BATCH_SIZE,
     ) -> List[RelevanceEdge]:
         edges: List[RelevanceEdge] = []
 
         for i in range(0, len(target_papers), batch_size):
             chunk = list(target_papers[i : i + batch_size])
-            prompt = self._create_batch_prompt(root_paper, chunk)
+            prompt = self._create_batch_prompt(root_paper, [p for p, _ in chunk])
 
             try:
                 data = self._call_llm_json(prompt)
                 parsed = self._parse_batch(data, n=len(chunk))
 
-                for target, result in zip(chunk, parsed):
-                    score_obj = RelevanceScore(
-                        llm_score=result.relevance_score,
-                        llm_explanation=result.explanation,
-                    )
-                    edge = RelevanceEdge(
-                        src_id=root_paper.id,
-                        dest_id=target.id,
-                        relevance_score=score_obj,
-                    )
+                for (_, edge), result in zip(chunk, parsed):
+                    edge.relevance_score.llm_score = result.relevance_score
+                    edge.relevance_score.llm_explanation = result.explanation
                     edges.append(edge)
 
             except Exception as e:
