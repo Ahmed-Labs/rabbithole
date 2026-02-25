@@ -3,7 +3,6 @@ from flask import Flask
 from flask_cors import CORS
 
 from app.api import bp as api_bp
-from app.main import bp as main_bp
 from app.services.graph_query import GraphQueryService
 from db import KnowledgeGraphReader, KnowledgeGraphWriter, Neo4jClient, Neo4jConfig
 from relevance_scoring import RelevanceScorer
@@ -23,8 +22,7 @@ def celery_init_app(app: Flask) -> Celery:
     return celery_app
 
 
-def init_neo4j(app: Flask) -> None:
-    """Initialize Neo4j client and services."""
+def init_extensions(app: Flask) -> None:
     neo4j_config = Neo4jConfig.from_env()
     neo4j_client = Neo4jClient(neo4j_config)
     reader = KnowledgeGraphReader(neo4j_client)
@@ -56,10 +54,9 @@ def create_app():
 
     # Initialize extensions
     celery_init_app(app)
-    init_neo4j(app)
+    init_extensions(app)
 
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix="/api")
-    app.register_blueprint(main_bp)
 
     return app

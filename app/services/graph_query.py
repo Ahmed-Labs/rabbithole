@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from db.reader import KnowledgeGraphReader
 from paper_retrieval.research_paper import ResearchPaper
@@ -8,11 +8,11 @@ from relevance_scoring.relevance_scorer import CitationEdge, RelevanceEdge
 
 @dataclass
 class GraphFilters:
+    max_depth: int = 3
     min_year: Optional[int] = None
     max_year: Optional[int] = None
     min_citations: Optional[int] = None
     min_relevance: Optional[float] = None
-    max_depth: int = 3
 
 
 class GraphQueryService:

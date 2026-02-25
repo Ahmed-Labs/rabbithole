@@ -1,16 +1,16 @@
-import traceback
+from typing import List, Tuple
 
 from celery.result import AsyncResult
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 
 from app.api import bp
+from app.extensions import get_graph_service, get_graph_writer, get_relevance_scorer
 from app.services.embedding_task import generate_embeddings_task
 from app.services.graph_formatting import ReactFlowFormatter
-from app.services.graph_query import GraphFilters, GraphQueryService
-from db import KnowledgeGraphWriter
-from paper_retrieval.paper_metadata import search
-from relevance_scoring.llm_scorer import LLMScorer
-from relevance_scoring.relevance_scorer import RelevanceEdge, RelevanceScorer
+from app.services.graph_query import GraphFilters
+from app.services.llm_task import generate_llm_score
+from paper_retrieval import ResearchPaper, search
+from relevance_scoring.relevance_scorer import RelevanceEdge
 
 
 @bp.route("/health")
@@ -33,7 +33,7 @@ def search_papers():
 
 
 @bp.route("/embed", methods=["POST"])
-def get_relevance():
+def embed():
     data = request.get_json(silent=True) or {}
 
     query = data.get("query")
@@ -69,20 +69,6 @@ def task_status(task_id: str):
     return jsonify(response)
 
 
-def get_graph_service() -> GraphQueryService:
-    """Get graph service from app extensions."""
-    return current_app.extensions["graph_service"]
-
-
-def get_relevance_scorer() -> RelevanceScorer:
-    """Get relevance scorer from app extensions."""
-    return current_app.extensions["relevance_scorer"]
-
-
-def get_graph_writer() -> KnowledgeGraphWriter:
-    return current_app.extensions["graph_writer"]
-
-
 @bp.route("/graph/<paper_id>", methods=["GET"])
 def get_graph(paper_id: str):
     """
@@ -98,6 +84,7 @@ def get_graph(paper_id: str):
         JSON with nodes and edges in React Flow format
     """
     filters = GraphFilters(
+        max_depth=request.args.get("max_depth", type=int) or 3,
         min_year=request.args.get("min_year", type=int),
         max_year=request.args.get("max_year", type=int),
         min_citations=request.args.get("min_citations", type=int),
@@ -113,19 +100,30 @@ def get_graph(paper_id: str):
         return jsonify({"error": "Paper not found"}), 404
 
     connected_pids = [pid for pid in papers.keys() if pid != paper_id]
-    relevance_pairs = [(r.src_id, r.dest_id) for r in relevance_edges]
+    relevance_pairs = {(r.src_id, r.dest_id): r for r in relevance_edges}
 
     # Generate missing relevance scores from embeddings
     relevance_scorer = get_relevance_scorer()
     new_relevance_edges: list[RelevanceEdge] = []
-    llm_task_batch = []  # TODO add celery task for llm score generation
+
+    # Each paper to score with LLM along with edge connecting it to the paper
+    llm_targets: List[Tuple[ResearchPaper, RelevanceEdge]] = []
+
+    p1 = papers.get(paper_id)
 
     for pid in connected_pids:
-        if (paper_id, pid) in relevance_pairs or (pid, paper_id) in relevance_pairs:
+        p2 = papers.get(pid, None)
+        if p2 is None:
             continue
 
-        p1, p2 = papers.get(paper_id, None), papers.get(pid, None)
-        if p1 is None or p2 is None:
+        if (paper_id, pid) in relevance_pairs or (pid, paper_id) in relevance_pairs:
+            edge = relevance_pairs.get(
+                (paper_id, pid), relevance_pairs.get((pid, paper_id))
+            )
+
+            if edge.relevance_score.llm_score is None:
+                llm_targets.append((p2, edge))
+
             continue
 
         score = relevance_scorer.compute_relevance_score(p1, p2)
@@ -139,7 +137,7 @@ def get_graph(paper_id: str):
         )
 
         new_relevance_edges.append(edge)
-        llm_task_batch.append((p1, p2, edge))
+        llm_targets.append((p2, edge))
 
     # Store new relevance edges and add them to response
     if len(new_relevance_edges) > 0:
@@ -147,8 +145,22 @@ def get_graph(paper_id: str):
         db.upsert_relevance_edges(new_relevance_edges)
         relevance_edges.extend(new_relevance_edges)
 
+    # Queue LLM task
+    task_data = {}
+    if len(llm_targets) > 0:
+        targets = [(p.to_props(), e.to_props()) for p, e in llm_targets]
+        task = generate_llm_score.delay(p1.to_props(), targets)
+
+        task_data["task_id"] = task.id
+        task_data["status"] = "queued"
+
     graph_data = ReactFlowFormatter.format_graph(
         papers, relevance_edges, citation_edges, root_id=paper_id
     )
 
-    return jsonify(graph_data)
+    return jsonify(
+        {
+            "data": graph_data,
+            **task_data,
+        }
+    )

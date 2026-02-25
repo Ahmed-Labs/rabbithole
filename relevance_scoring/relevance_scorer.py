@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -11,9 +13,9 @@ from relevance_scoring.embedder import Embedder
 
 @dataclass
 class RelevanceScore:
-    semantic_similarity: float
-    year_similarity: float
-    citation_score: float
+    semantic_similarity: float = 0.0
+    year_similarity: float = 0.0
+    citation_score: float = 0.0
     llm_score: Optional[float] = None
     llm_explanation: Optional[str] = None
 
@@ -34,7 +36,6 @@ class RelevanceScore:
 
     def to_props(self):
         props = {
-            "relevance_score": self.combined,
             "semantic_similarity": self.semantic_similarity,
             "year_similarity": self.year_similarity,
             "citation_score": self.citation_score,
@@ -46,18 +47,62 @@ class RelevanceScore:
 
         return props
 
+    @classmethod
+    def from_props(cls, score: Dict[str, Any]) -> RelevanceScore:
+        return cls(
+            semantic_similarity=score.get("semantic_similarity", 0.0),
+            year_similarity=score.get("year_similarity", 0.0),
+            citation_score=score.get("citation_score", 0.0),
+            llm_score=score.get("llm_score", None),
+            llm_explanation=score.get("llm_explanation", None),
+        )
+
 
 @dataclass(frozen=True)
 class RelevanceEdge:
     src_id: str
     dest_id: str
-    relevance_score: RelevanceScore
+    relevance_score: Optional[RelevanceScore] = None
+
+    def to_props(self):
+        props = {
+            "src": self.src_id,
+            "dest": self.dest_id,
+        }
+        if self.relevance_score is not None:
+            props["props"] = self.relevance_score.to_props()
+
+        return props
+
+    @classmethod
+    def from_props(cls, edge: Dict[str, Any]) -> RelevanceEdge:
+        score = edge.get("props", None)
+        return cls(
+            src_id=edge.get("src"),
+            dest_id=edge.get("dest"),
+            relevance_score=(
+                RelevanceScore.from_props(score) if score is not None else None
+            ),
+        )
 
 
 @dataclass(frozen=True)
 class CitationEdge:
     src_id: str
     dest_id: str
+
+    def to_props(self):
+        return {
+            "src": self.src_id,
+            "dest": self.dest_id,
+        }
+
+    @classmethod
+    def from_props(cls, edge: Dict) -> CitationEdge:
+        return cls(
+            src_id=edge.get("src"),
+            dest_id=edge.get("dest"),
+        )
 
 
 class RelevanceScorer:
