@@ -163,20 +163,21 @@ class RelevanceScorer:
         root_paper: ResearchPaper,
         target_paper: ResearchPaper,
     ) -> float:
-        # Full text similarity
-        root_text = self.embedder.store.get(root_paper.id + TEXT_TAG)
-        target_text = self.embedder.store.get(target_paper.id + TEXT_TAG)
-
-        # Title + abstract embeddings
         root_meta = self.embedder.store.get(root_paper.id + META_TAG)
         target_meta = self.embedder.store.get(target_paper.id + META_TAG)
 
-        if any(e is None for e in (root_text, target_text, root_meta, target_meta)):
+        if root_meta is None or target_meta is None:
             return 0.0
 
-        text_sim = self._cosine_similarity(root_text, target_text)
         meta_sim = self._cosine_similarity(root_meta, target_meta)
 
+        root_text = self.embedder.store.get(root_paper.id + TEXT_TAG)
+        target_text = self.embedder.store.get(target_paper.id + TEXT_TAG)
+
+        if root_text is None or target_text is None:
+            return meta_sim
+
+        text_sim = self._cosine_similarity(root_text, target_text)
         return TEXT_SEMANTIC_WEIGHT * text_sim + META_SEMANTIC_WEIGHT * meta_sim
 
     def compute_relevance_score(

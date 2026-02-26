@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Optional
 
 from paper_retrieval.research_paper import ResearchPaper
@@ -42,11 +43,17 @@ class ReactFlowFormatter:
     def _build_node(
         paper: ResearchPaper, relevance_score: RelevanceScore, is_root: bool
     ) -> Dict[str, Any]:
+        props = paper.to_props()
+        props["authors"] = [
+            json.loads(a) if isinstance(a, str) else a
+            for a in (props.get("authors") or [])
+        ]
+
         return {
             "id": paper.id,
             "type": "paperNode",
             "data": {
-                **paper.to_props(),
+                **props,
                 "relevance_score": relevance_score.combined,
                 "llm_explanation": relevance_score.llm_explanation,
                 "is_root": is_root,

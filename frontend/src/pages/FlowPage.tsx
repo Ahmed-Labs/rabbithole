@@ -28,13 +28,14 @@ interface PaperData {
   id: string;
   title: string;
   abstract: string;
-  authors: string[];
+  authors: { authorId: string; name: string }[];
   year: number;
   citation_count: number;
   relevance_score: number;
   is_root: boolean;
   pdf_url: string;
   url: string;
+  llm_explanation: string | null;
 }
 
 interface SchemaNode {
@@ -52,10 +53,14 @@ interface SchemaEdge {
   data: object;
 }
 
-export interface GraphSchema {
+interface GraphData {
   nodes: SchemaNode[];
   edges: SchemaEdge[];
   root_id: string;
+}
+
+export interface GraphSchema {
+  data: GraphData;
 }
 
 function relevanceColor(score: number): string {
@@ -69,7 +74,7 @@ function relevanceColor(score: number): string {
 }
 
 function computePositions(
-  schema: GraphSchema,
+  schema: GraphData,
 ): Record<string, { x: number; y: number }> {
   const NODE_W = 260;
   const NODE_H = 200;
@@ -137,7 +142,7 @@ function computePositions(
   return positions;
 }
 
-function toFlowGraph(schema: GraphSchema): { nodes: Node[]; edges: Edge[] } {
+function toFlowGraph(schema: GraphData): { nodes: Node[]; edges: Edge[] } {
   const positions = computePositions(schema);
 
   const nodes: Node[] = schema.nodes.map((n) => ({
@@ -154,6 +159,7 @@ function toFlowGraph(schema: GraphSchema): { nodes: Node[]; edges: Edge[] } {
       pdf_url: n.data.pdf_url,
       url: n.data.url,
       isRoot: n.data.is_root,
+      llm_explanation: n.data.llm_explanation,
     },
   }));
 
@@ -174,10 +180,11 @@ interface PaperNodeData {
   citation_count: number;
   relevance_score: number;
   abstract: string;
-  authors: string[];
+  authors: { authorId: string; name: string }[];
   pdf_url: string;
   url: string;
   isRoot: boolean;
+  llm_explanation: string | null;
 }
 
 const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
@@ -275,7 +282,9 @@ function DetailPanel({
             <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
               Authors
             </p>
-            <p className="text-xs text-zinc-300">{data.authors.join(", ")}</p>
+            <p className="text-xs text-zinc-300">
+              {data.authors.map((a) => a.name).join(", ")}
+            </p>
           </div>
         )}
         {data.abstract && (
@@ -285,6 +294,16 @@ function DetailPanel({
             </p>
             <p className="text-xs text-zinc-300 leading-relaxed">
               {data.abstract}
+            </p>
+          </div>
+        )}
+        {data.llm_explanation && (
+          <div>
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
+              Relevance explanation
+            </p>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              {data.llm_explanation}
             </p>
           </div>
         )}
@@ -403,7 +422,7 @@ const floatStyle = `
 `;
 
 export function FlowPage({ onBack }: FlowPageProps) {
-  const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH);
+  const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH.data);
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [selectedPaper, setSelectedPaper] = useState<PaperNodeData | null>(
     null,
