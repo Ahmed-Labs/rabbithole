@@ -28,6 +28,8 @@ class RelevanceScore:
         )
 
         if self.llm_score is not None:
+            if existing_score == 0.0:
+                return self.llm_score
             return (
                 1 - LLM_SCORE_WEIGHT
             ) * existing_score + LLM_SCORE_WEIGHT * self.llm_score
