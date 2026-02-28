@@ -13,6 +13,7 @@ import type {
   OnNodesChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import dagre from "dagre";
 import { MOCK_GRAPH } from "../../mocks/mockGraph";
 import type { GraphData, PaperFlowNode, PaperNodeData } from "../types/graph";
 import { PaperNode } from "../components/PaperNode";
@@ -24,6 +25,9 @@ import { FlowHeader } from "../components/FlowHeader";
 
 const nodeTypes: NodeTypes = { paperNode: PaperNode };
 
+const NODE_W = 210;
+const NODE_H = 100;
+
 const floatStyle = `
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
@@ -34,93 +38,44 @@ const floatStyle = `
   }
 `;
 
-function computePositions(
-  schema: GraphData,
-): Record<string, { x: number; y: number }> {
-  const NODE_W = 260;
-  const NODE_H = 200;
-  const { root_id, edges } = schema;
-
-  const children: Record<string, string[]> = {};
-  const parents: Record<string, string[]> = {};
-  schema.nodes.forEach((n) => {
-    children[n.id] = [];
-    parents[n.id] = [];
-  });
-  edges.forEach((e) => {
-    children[e.source].push(e.target);
-    parents[e.target].push(e.source);
-  });
-
-  const depth: Record<string, number> = {};
-  const queue: string[] = [root_id];
-  depth[root_id] = 0;
-  while (queue.length) {
-    const id = queue.shift()!;
-    for (const child of children[id]) {
-      if (depth[child] === undefined) {
-        depth[child] = depth[id] + 1;
-        queue.push(child);
-      }
-    }
-  }
-
-  const upQueue: string[] = [root_id];
-  while (upQueue.length) {
-    const id = upQueue.shift()!;
-    for (const parent of parents[id]) {
-      if (depth[parent] === undefined) {
-        depth[parent] = depth[id] - 1;
-        upQueue.push(parent);
-      }
-    }
-  }
-
-  schema.nodes.forEach((n) => {
-    if (depth[n.id] === undefined) depth[n.id] = 0;
-  });
-
-  const levels: Record<number, string[]> = {};
-  schema.nodes.forEach((n) => {
-    const d = depth[n.id];
-    if (!levels[d]) levels[d] = [];
-    levels[d].push(n.id);
-  });
-
-  const positions: Record<string, { x: number; y: number }> = {};
-  Object.entries(levels).forEach(([d, ids]) => {
-    const totalWidth = (ids.length - 1) * NODE_W;
-    ids.forEach((id, i) => {
-      positions[id] = { x: i * NODE_W - totalWidth / 2, y: Number(d) * NODE_H };
-    });
-  });
-
-  return positions;
-}
-
 function toFlowGraph(schema: GraphData): {
   nodes: PaperFlowNode[];
   edges: Edge[];
 } {
-  const positions = computePositions(schema);
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80 });
+  g.setDefaultEdgeLabel(() => ({}));
 
-  const nodes: PaperFlowNode[] = schema.nodes.map((n) => ({
-    id: n.id,
-    type: "paperNode",
-    position: positions[n.id] ?? { x: 0, y: 0 },
-    data: {
-      title: n.data.title,
-      year: n.data.year,
-      citation_count: n.data.citation_count,
-      relevance_score: n.data.relevance_score,
-      abstract: n.data.abstract,
-      authors: n.data.authors,
-      pdf_url: n.data.pdf_url,
-      url: n.data.url,
-      isRoot: n.data.is_root,
-      llm_explanation: n.data.llm_explanation,
-    },
-  }));
+  schema.nodes.forEach((n) =>
+    g.setNode(n.id, { width: NODE_W, height: NODE_H }),
+  );
+  schema.edges.forEach((e) => g.setEdge(e.source, e.target));
+  dagre.layout(g);
+
+  const rootNode = g.node(schema.root_id);
+  const offsetX = rootNode ? rootNode.x : 0;
+  const offsetY = rootNode ? rootNode.y : 0;
+
+  const nodes: PaperFlowNode[] = schema.nodes.map((n) => {
+    const { x, y } = g.node(n.id);
+    return {
+      id: n.id,
+      type: "paperNode",
+      position: { x: x - offsetX, y: y - offsetY },
+      data: {
+        title: n.data.title,
+        year: n.data.year,
+        citation_count: n.data.citation_count,
+        relevance_score: n.data.relevance_score,
+        abstract: n.data.abstract,
+        authors: n.data.authors,
+        pdf_url: n.data.pdf_url,
+        url: n.data.url,
+        isRoot: n.data.is_root,
+        llm_explanation: n.data.llm_explanation,
+      },
+    };
+  });
 
   const edges: Edge[] = schema.edges.map((e) => ({
     id: e.id,
