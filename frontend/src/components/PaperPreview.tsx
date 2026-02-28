@@ -2,15 +2,9 @@ import { useState } from "react";
 import type { Paper } from "../types/Paper";
 import "./PaperPreview.css";
 
-export interface AnalysisOptions {
-  paper: Paper;
-  referenceDepth: number;
-  includeCitations: boolean;
-}
-
 interface PaperPreviewProps {
   paper: Paper | null;
-  onAnalyze: (options: AnalysisOptions) => void;
+  onAnalyze: (paperId: string, depth: number) => void;
 }
 
 export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
@@ -22,10 +16,6 @@ export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
       <div className="paper-preview__empty">Select a paper to view details</div>
     );
   }
-
-  const handleAnalyze = () => {
-    onAnalyze({ paper, referenceDepth, includeCitations });
-  };
 
   return (
     <div className="paper-preview">
@@ -70,9 +60,7 @@ export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
             <button
               type="button"
               onClick={() => setIncludeCitations(!includeCitations)}
-              className={`paper-preview__toggle ${
-                includeCitations ? "paper-preview__toggle--on" : ""
-              }`}
+              className={`paper-preview__toggle ${includeCitations ? "paper-preview__toggle--on" : ""}`}
             >
               <span className="paper-preview__toggle-knob" />
             </button>
@@ -82,7 +70,7 @@ export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
           <button
             type="button"
             className="paper-preview__analyze-btn"
-            onClick={handleAnalyze}
+            onClick={() => onAnalyze(paper.id, referenceDepth)}
           >
             Analyze
           </button>

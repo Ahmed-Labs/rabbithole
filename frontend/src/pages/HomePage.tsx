@@ -1,18 +1,16 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import rabbitLogo from "../assets/rabbit-logo.png";
 import "./HomePage.css";
 
-interface HomePageProps {
-  onSearch: (query: string) => void;
-}
-
-export function HomePage({ onSearch }: HomePageProps) {
+export function HomePage() {
   const [query, setQuery] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      onSearch(query.trim());
+      navigate(`/results?q=${encodeURIComponent(query.trim())}`);
     }
   };
 

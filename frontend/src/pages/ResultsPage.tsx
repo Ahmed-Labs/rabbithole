@@ -1,21 +1,16 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import rabbitLogo from "../assets/rabbit-logo.png";
 import type { Paper } from "../types/Paper";
 import { PaperCard } from "../components/PaperCard";
-import { PaperPreview, type AnalysisOptions } from "../components/PaperPreview";
+import { PaperPreview } from "../components/PaperPreview";
 import "./ResultsPage.css";
 
-interface ResultsPageProps {
-  searchQuery: string;
-  onNewSearch: () => void;
-  onAnalyze: (options: AnalysisOptions) => void;
-}
+export function ResultsPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const searchQuery = searchParams.get("q") ?? "";
 
-export function ResultsPage({
-  searchQuery,
-  onNewSearch,
-  onAnalyze,
-}: ResultsPageProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
@@ -48,29 +43,25 @@ export function ResultsPage({
       setLoading(true);
       setError(null);
       try {
-        const url = `/api/search?query=${encodeURIComponent(searchQuery)}`;
-        const response = await fetch(url);
-
+        const response = await fetch(
+          `/api/search?query=${encodeURIComponent(searchQuery)}`,
+        );
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(
             errorData.error || `Failed to search papers (${response.status})`,
           );
         }
-
         const data = await response.json();
         const list = (data.papers ?? []).map(mapPaper);
         setPapers(list);
-        if (list.length > 0) {
-          setSelectedPaper(list[0]);
-        }
+        if (list.length > 0) setSelectedPaper(list[0]);
       } catch (err) {
-        const errorMessage =
+        setError(
           err instanceof Error
             ? err.message
-            : "Unknown error occurred. Make sure the Flask backend is running on port 5000.";
-        setError(errorMessage);
-        console.error("Search error:", err);
+            : "Unknown error occurred. Make sure the Flask backend is running on port 5000.",
+        );
       } finally {
         setLoading(false);
       }
@@ -78,6 +69,10 @@ export function ResultsPage({
 
     fetchPapers();
   }, [searchQuery]);
+
+  const handleAnalyze = (paperId: string, depth: number) => {
+    navigate(`/flow?paperId=${paperId}&depth=${depth}`);
+  };
 
   const filteredPapers = papers.filter((paper) =>
     paper.title.toLowerCase().includes(filterQuery.toLowerCase()),
@@ -94,7 +89,7 @@ export function ResultsPage({
           <div className="results__header-actions">
             <button
               type="button"
-              onClick={onNewSearch}
+              onClick={() => navigate("/")}
               className="results__header-btn"
             >
               New search
@@ -152,7 +147,7 @@ export function ResultsPage({
 
         <section className="results__preview-section">
           <div ref={previewScrollRef} className="results__preview-scroll">
-            <PaperPreview paper={selectedPaper} onAnalyze={onAnalyze} />
+            <PaperPreview paper={selectedPaper} onAnalyze={handleAnalyze} />
           </div>
         </section>
       </main>

@@ -1,149 +1,152 @@
-import { memo } from "react";
+import { useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ReactFlow,
   Background,
   MiniMap,
-  Panel,
-  useReactFlow,
-  Handle,
-  Position,
+  applyNodeChanges,
 } from "@xyflow/react";
-import type { Node, Edge, NodeTypes } from "@xyflow/react";
+import type {
+  Edge,
+  NodeTypes,
+  NodeMouseHandler,
+  OnNodesChange,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { AnalysisOptions } from "../components/PaperPreview";
-import rabbitLogo from "../assets/rabbit-logo.png";
+import dagre from "dagre";
+import { MOCK_GRAPH } from "../../mocks/mockGraph";
+import type { GraphData, PaperFlowNode, PaperNodeData } from "../types/graph";
+import { PaperNode } from "../components/PaperNode";
+import { relevanceColor } from "../utils/relevanceColor";
+import { DetailPanel } from "../components/DetailPanel";
+import { Legend } from "../components/Legend";
+import { FlowControls } from "../components/FlowControls";
+import { FlowHeader } from "../components/FlowHeader";
 
-interface FlowPageProps {
-  analysisOptions: AnalysisOptions;
-  onBack: () => void;
-}
+const nodeTypes: NodeTypes = { paperNode: PaperNode };
 
-const PaperNode = memo(({ data }: { data: { label: string } }) => (
-  <div className="px-3 py-2 rounded border border-zinc-600 bg-[var(--color-card-bg)] text-white text-xs w-40">
-    <Handle type="target" position={Position.Top} />
-    {data.label}
-    <Handle type="source" position={Position.Bottom} />
-  </div>
-));
+const NODE_W = 210;
+const NODE_H = 100;
 
-const nodeTypes: NodeTypes = { paper: PaperNode };
+const floatStyle = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
+  }
+  .paper-node-float {
+    animation: float 3s ease-in-out infinite;
+  }
+`;
 
-function buildInitialGraph(options: AnalysisOptions): {
-  nodes: Node[];
+function toFlowGraph(schema: GraphData): {
+  nodes: PaperFlowNode[];
   edges: Edge[];
 } {
-  const { paper, referenceDepth } = options;
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80 });
+  g.setDefaultEdgeLabel(() => ({}));
 
-  const nodes: Node[] = [
-    {
-      id: "root",
-      type: "paper",
-      position: { x: 400, y: 0 },
+  schema.nodes.forEach((n) =>
+    g.setNode(n.id, { width: NODE_W, height: NODE_H }),
+  );
+  schema.edges.forEach((e) => g.setEdge(e.source, e.target));
+  dagre.layout(g);
+
+  const rootNode = g.node(schema.root_id);
+  const offsetX = rootNode ? rootNode.x : 0;
+  const offsetY = rootNode ? rootNode.y : 0;
+
+  const nodes: PaperFlowNode[] = schema.nodes.map((n) => {
+    const { x, y } = g.node(n.id);
+    return {
+      id: n.id,
+      type: "paperNode",
+      position: { x: x - offsetX, y: y - offsetY },
       data: {
-        label:
-          paper.title.length > 40
-            ? paper.title.slice(0, 40) + "…"
-            : paper.title,
+        title: n.data.title,
+        year: n.data.year,
+        citation_count: n.data.citation_count,
+        relevance_score: n.data.relevance_score,
+        abstract: n.data.abstract,
+        authors: n.data.authors,
+        pdf_url: n.data.pdf_url,
+        url: n.data.url,
+        isRoot: n.data.is_root,
+        llm_explanation: n.data.llm_explanation,
       },
-    },
-  ];
-  const edges: Edge[] = [];
+    };
+  });
 
-  for (let depth = 1; depth <= referenceDepth; depth++) {
-    const count = Math.max(1, 4 - depth);
-    const xSpacing = 800 / (count + 1);
-
-    for (let i = 0; i < count; i++) {
-      const nodeId = `node-d${depth}-${i}`;
-      const parentId =
-        depth === 1 ? "root" : `node-d${depth - 1}-${Math.floor(i / 2)}`;
-
-      nodes.push({
-        id: nodeId,
-        type: "paper",
-        position: { x: xSpacing * (i + 1) - 40, y: depth * 160 },
-        data: { label: `Paper ${depth}-${i + 1}` },
-      });
-
-      edges.push({
-        id: `e-${parentId}-${nodeId}`,
-        source: parentId,
-        target: nodeId,
-      });
-    }
-  }
+  const edges: Edge[] = schema.edges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    animated: true,
+    style: { stroke: "#3f3f46", strokeWidth: 1.5 },
+  }));
 
   return { nodes, edges };
 }
 
-function FlowControls() {
-  const { zoomIn, zoomOut, fitView } = useReactFlow();
-  const btnClass =
-    "w-8 h-8 flex items-center justify-center bg-[var(--color-panel-bg)] border border-zinc-700 text-white hover:bg-[var(--color-card-bg)] cursor-pointer transition-colors text-sm";
-  return (
-    <Panel position="bottom-left">
-      <div className="flex flex-col rounded-lg overflow-hidden border border-zinc-700">
-        <button className={btnClass} onClick={() => zoomIn()}>
-          +
-        </button>
-        <button className={btnClass} onClick={() => zoomOut()}>
-          −
-        </button>
-        <button className={btnClass} onClick={() => fitView()}>
-          ⊡
-        </button>
-      </div>
-    </Panel>
+export function FlowPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const paperId = searchParams.get("paperId") ?? "";
+  const depth = Number(searchParams.get("depth") ?? 3);
+
+  const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH.data);
+  const [nodes, setNodes] = useState<PaperFlowNode[]>(initialNodes);
+  const [selectedPaper, setSelectedPaper] = useState<PaperNodeData | null>(
+    null,
   );
-}
 
-function FlowHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="p-6 pb-0">
-      <header className="flex items-center justify-between px-6 py-4 bg-[var(--color-panel-bg)] rounded-lg">
-        <div className="flex items-center gap-1 text-2xl font-semibold">
-          RabbitHole
-          <img src={rabbitLogo} alt="Logo" className="h-6 w-auto" />
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="px-4 py-2 text-sm border border-zinc-600 rounded-lg bg-transparent text-white cursor-pointer hover:bg-zinc-800 transition-colors"
-          >
-            ← Back
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm border border-zinc-600 rounded-lg bg-transparent text-white cursor-pointer hover:bg-zinc-800 transition-colors"
-          >
-            Settings
-          </button>
-        </div>
-      </header>
-    </div>
+  const onNodesChange: OnNodesChange<PaperFlowNode> = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    [],
   );
-}
 
-export function FlowPage({ analysisOptions, onBack }: FlowPageProps) {
-  const { nodes, edges } = buildInitialGraph(analysisOptions);
+  const onNodeClick: NodeMouseHandler = useCallback((_e, node) => {
+    setSelectedPaper((node as unknown as PaperFlowNode).data);
+  }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--color-page-bg)] text-white">
-      <FlowHeader onBack={onBack} />
+    <>
+      <style>{floatStyle}</style>
+      <div className="h-screen flex flex-col bg-[var(--color-page-bg)] text-white">
+        <FlowHeader onBack={() => navigate(-1)} />
 
-      <div className="flex-1 min-h-0 m-6 rounded-lg overflow-hidden bg-[var(--color-input-bg-dark)] flex flex-col">
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView>
-          <Background color="var(--color-border-default)" gap={20} />
-          <FlowControls />
-          <MiniMap
-            className="!bg-[var(--color-panel-bg)] !border !border-zinc-700 rounded-lg"
-            nodeColor="#3621f6"
-            nodeStrokeWidth={0}
-            maskColor="rgba(9,13,20,0.6)"
-          />
-        </ReactFlow>
+        <div className="flex-1 min-h-0 m-6 rounded-lg overflow-hidden bg-[var(--color-input-bg-dark)] flex flex-col relative">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onNodeClick={onNodeClick}
+            fitView
+          >
+            <Background color="var(--color-border-default)" gap={20} />
+            <FlowControls />
+            <Legend />
+            <MiniMap
+              className="!bg-[var(--color-panel-bg)] !border !border-zinc-700 rounded-lg"
+              nodeColor={(node) => {
+                const d = (node as unknown as PaperFlowNode).data;
+                return d.isRoot ? "#818cf8" : relevanceColor(d.relevance_score);
+              }}
+              nodeStrokeWidth={0}
+              maskColor="rgba(9,13,20,0.6)"
+            />
+          </ReactFlow>
+
+          {selectedPaper && (
+            <DetailPanel
+              data={selectedPaper}
+              onClose={() => setSelectedPaper(null)}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
