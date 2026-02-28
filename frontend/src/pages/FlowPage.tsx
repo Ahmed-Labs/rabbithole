@@ -142,10 +142,13 @@ function computePositions(
   return positions;
 }
 
-function toFlowGraph(schema: GraphData): { nodes: Node[]; edges: Edge[] } {
+function toFlowGraph(schema: GraphData): {
+  nodes: PaperFlowNode[];
+  edges: Edge[];
+} {
   const positions = computePositions(schema);
 
-  const nodes: Node[] = schema.nodes.map((n) => ({
+  const nodes: PaperFlowNode[] = schema.nodes.map((n) => ({
     id: n.id,
     type: "paperNode",
     position: positions[n.id] ?? { x: 0, y: 0 },
@@ -174,7 +177,7 @@ function toFlowGraph(schema: GraphData): { nodes: Node[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
-interface PaperNodeData {
+type PaperNodeData = Record<string, unknown> & {
   title: string;
   year: number;
   citation_count: number;
@@ -185,7 +188,9 @@ interface PaperNodeData {
   url: string;
   isRoot: boolean;
   llm_explanation: string | null;
-}
+};
+
+type PaperFlowNode = Node<PaperNodeData, "paperNode">;
 
 const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
   const color = data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
@@ -423,18 +428,18 @@ const floatStyle = `
 
 export function FlowPage({ onBack }: FlowPageProps) {
   const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH.data);
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [nodes, setNodes] = useState<PaperFlowNode[]>(initialNodes);
   const [selectedPaper, setSelectedPaper] = useState<PaperNodeData | null>(
     null,
   );
 
-  const onNodesChange: OnNodesChange = useCallback(
+  const onNodesChange: OnNodesChange<PaperFlowNode> = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
     [],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_e, node) => {
-    setSelectedPaper(node.data as unknown as PaperNodeData);
+    setSelectedPaper((node as unknown as PaperFlowNode).data);
   }, []);
 
   return (
@@ -458,7 +463,7 @@ export function FlowPage({ onBack }: FlowPageProps) {
             <MiniMap
               className="!bg-[var(--color-panel-bg)] !border !border-zinc-700 rounded-lg"
               nodeColor={(node) => {
-                const d = node.data as unknown as PaperNodeData;
+                const d = (node as unknown as PaperFlowNode).data;
                 return d.isRoot ? "#818cf8" : relevanceColor(d.relevance_score);
               }}
               nodeStrokeWidth={0}
