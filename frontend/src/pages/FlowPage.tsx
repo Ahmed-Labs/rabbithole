@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ReactFlow,
   Background,
@@ -21,11 +22,17 @@ import { Legend } from "../components/Legend";
 import { FlowControls } from "../components/FlowControls";
 import { FlowHeader } from "../components/FlowHeader";
 
-interface FlowPageProps {
-  onBack: () => void;
-}
-
 const nodeTypes: NodeTypes = { paperNode: PaperNode };
+
+const floatStyle = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
+  }
+  .paper-node-float {
+    animation: float 3s ease-in-out infinite;
+  }
+`;
 
 function computePositions(
   schema: GraphData,
@@ -126,17 +133,13 @@ function toFlowGraph(schema: GraphData): {
   return { nodes, edges };
 }
 
-const floatStyle = `
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-4px); }
-  }
-  .paper-node-float {
-    animation: float 3s ease-in-out infinite;
-  }
-`;
+export function FlowPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-export function FlowPage({ onBack }: FlowPageProps) {
+  const paperId = searchParams.get("paperId") ?? "";
+  const depth = Number(searchParams.get("depth") ?? 3);
+
   const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH.data);
   const [nodes, setNodes] = useState<PaperFlowNode[]>(initialNodes);
   const [selectedPaper, setSelectedPaper] = useState<PaperNodeData | null>(
@@ -156,7 +159,7 @@ export function FlowPage({ onBack }: FlowPageProps) {
     <>
       <style>{floatStyle}</style>
       <div className="h-screen flex flex-col bg-[var(--color-page-bg)] text-white">
-        <FlowHeader onBack={onBack} />
+        <FlowHeader onBack={() => navigate(-1)} />
 
         <div className="flex-1 min-h-0 m-6 rounded-lg overflow-hidden bg-[var(--color-input-bg-dark)] flex flex-col relative">
           <ReactFlow
@@ -173,7 +176,7 @@ export function FlowPage({ onBack }: FlowPageProps) {
             <MiniMap
               className="!bg-[var(--color-panel-bg)] !border !border-zinc-700 rounded-lg"
               nodeColor={(node) => {
-                                const d = (node as unknown as PaperFlowNode).data;
+                const d = (node as unknown as PaperFlowNode).data;
                 return d.isRoot ? "#818cf8" : relevanceColor(d.relevance_score);
               }}
               nodeStrokeWidth={0}
