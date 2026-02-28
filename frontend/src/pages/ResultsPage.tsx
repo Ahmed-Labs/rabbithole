@@ -116,7 +116,9 @@ export function ResultsPage() {
             />
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
               {loading ? (
-                <div className="text-center py-8 text-placeholder">Loading...</div>
+                <div className="text-center py-8 text-placeholder">
+                  Loading...
+                </div>
               ) : error ? (
                 <div className="text-center py-8 text-danger">{error}</div>
               ) : filteredPapers.length === 0 ? (
