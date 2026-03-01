@@ -4,7 +4,6 @@ import rabbitLogo from "../assets/rabbit-logo.png";
 import type { Paper } from "../types/Paper";
 import { PaperCard } from "../components/PaperCard";
 import { PaperPreview } from "../components/PaperPreview";
-import "./ResultsPage.css";
 
 export function ResultsPage() {
   const [searchParams] = useSearchParams();
@@ -79,50 +78,51 @@ export function ResultsPage() {
   );
 
   return (
-    <div className="results">
-      <div className="results__header-wrap">
-        <header className="results__header">
-          <div className="results__brand">
+    <div className="min-h-screen bg-page-bg text-text flex flex-col">
+      <div className="px-6 pt-6">
+        <header className="flex items-center justify-between px-6 py-4 bg-panel-bg rounded-lg">
+          <div className="flex items-center gap-1 text-2xl font-semibold">
             RabbitHole
-            <img src={rabbitLogo} alt="Logo" className="results__logo" />
+            <img src={rabbitLogo} alt="Logo" className="h-6 w-auto" />
           </div>
-          <div className="results__header-actions">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="results__header-btn"
+              className="px-4 py-2 text-sm border border-zinc-600 rounded-lg bg-transparent text-text cursor-pointer hover:bg-zinc-800 transition-colors"
             >
               New search
             </button>
-            <button type="button" className="results__header-btn">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm border border-zinc-600 rounded-lg bg-transparent text-text cursor-pointer hover:bg-zinc-800 transition-colors"
+            >
               Settings
             </button>
           </div>
         </header>
       </div>
 
-      <main className="results__main">
-        <aside className="results__aside">
-          <div className="results__panel">
-            <h2 className="results__panel-title">Results</h2>
+      <main className="flex-1 min-h-0 flex overflow-hidden p-6 gap-6 items-stretch">
+        <aside className="w-1/3 flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col bg-input-bg-dark rounded-lg p-4">
+            <h2 className="text-lg font-semibold text-text mb-3">Results</h2>
             <input
               type="text"
               placeholder="Search within results"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              className="results__filter-input"
+              className="w-full px-3 py-2 bg-panel-bg border border-border-default rounded text-text placeholder:text-placeholder mb-4 focus:outline-none focus:ring-2 focus:ring-focus"
             />
-            <div className="results__list">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
               {loading ? (
-                <div className="results__message results__message--muted">
+                <div className="text-center py-8 text-placeholder">
                   Loading...
                 </div>
               ) : error ? (
-                <div className="results__message results__message--error">
-                  {error}
-                </div>
+                <div className="text-center py-8 text-danger">{error}</div>
               ) : filteredPapers.length === 0 ? (
-                <div className="results__message results__message--muted">
+                <div className="text-center py-8 text-placeholder">
                   No papers found
                 </div>
               ) : (
@@ -145,8 +145,11 @@ export function ResultsPage() {
           </div>
         </aside>
 
-        <section className="results__preview-section">
-          <div ref={previewScrollRef} className="results__preview-scroll">
+        <section className="flex-1 flex flex-col min-h-0">
+          <div
+            ref={previewScrollRef}
+            className="flex-1 min-h-0 overflow-y-auto p-6 bg-input-bg-dark rounded-lg"
+          >
             <PaperPreview paper={selectedPaper} onAnalyze={handleAnalyze} />
           </div>
         </section>

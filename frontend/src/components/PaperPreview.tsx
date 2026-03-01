@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { Paper } from "../types/Paper";
-import "./PaperPreview.css";
 
 interface PaperPreviewProps {
   paper: Paper | null;
@@ -13,63 +12,87 @@ export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
 
   if (!paper) {
     return (
-      <div className="paper-preview__empty">Select a paper to view details</div>
+      <div className="min-h-[400px] flex items-center justify-center text-placeholder">
+        Select a paper to view details
+      </div>
     );
   }
 
   return (
-    <div className="paper-preview">
-      <div className="paper-preview__root">
-        <h2 className="paper-preview__section-title">Root paper preview</h2>
-        <h3 className="paper-preview__title">{paper.title}</h3>
-        <div className="paper-preview__tags">
-          <span className="paper-preview__tag">{paper.year || "N/A"}</span>
-          <span className="paper-preview__tag">IEEE</span>
-          <span className="paper-preview__tag">
+    <div className="flex flex-col">
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold text-text mb-4">
+          Root paper preview
+        </h2>
+        <h3 className="text-xl font-semibold text-text mb-3">{paper.title}</h3>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
+            {paper.year || "N/A"}
+          </span>
+          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
+            IEEE
+          </span>
+          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
             {paper.citationCount} citations
           </span>
         </div>
 
-        <div className="paper-preview__abstract-box">
-          <h3 className="paper-preview__abstract-title">Abstract</h3>
-          <p className="paper-preview__abstract-text">
+        <div className="mb-4 p-4 bg-panel-bg rounded-lg">
+          <h3 className="text-text font-medium mb-2">Abstract</h3>
+          <p className="text-text-secondary text-sm leading-7">
             {paper.abstract || "No abstract available."}
           </p>
         </div>
       </div>
 
-      <div className="paper-preview__options">
-        <h2 className="paper-preview__section-title">Analysis options</h2>
-        <div className="paper-preview__options-inner">
+      <div>
+        <h2 className="text-lg font-semibold text-text mb-4">
+          Analysis options
+        </h2>
+
+        <div className="flex flex-col gap-4">
           <div>
-            <label className="paper-preview__label">Reference depth:</label>
+            <label className="block text-sm text-text-secondary mb-2">
+              Reference depth:
+            </label>
             <input
               type="number"
               min={1}
               max={5}
               value={referenceDepth}
               onChange={(e) => setReferenceDepth(Number(e.target.value))}
-              className="paper-preview__input"
+              className="w-full px-3 py-2 bg-panel-bg border border-border-default rounded text-text focus:outline-none focus:ring-2 focus:ring-focus"
             />
           </div>
 
-          <div className="paper-preview__toggle-row">
-            <label className="paper-preview__toggle-label">
+          <div className="flex items-center justify-between gap-4">
+            <label className="text-sm text-text-secondary">
               Include papers that cite this paper
             </label>
             <button
               type="button"
               onClick={() => setIncludeCitations(!includeCitations)}
-              className={`paper-preview__toggle ${includeCitations ? "paper-preview__toggle--on" : ""}`}
+              className={[
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer",
+                includeCitations ? "bg-focus" : "bg-border-default",
+              ].join(" ")}
+              aria-pressed={includeCitations}
             >
-              <span className="paper-preview__toggle-knob" />
+              <span
+                className={[
+                  "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
+                  includeCitations ? "translate-x-5" : "translate-x-1",
+                ].join(" ")}
+              />
             </button>
           </div>
         </div>
-        <div className="paper-preview__analyze-wrap">
+
+        <div className="mt-6 flex justify-end">
           <button
             type="button"
-            className="paper-preview__analyze-btn"
+            className="px-8 py-3 bg-primary text-text font-medium rounded-full cursor-pointer hover:bg-primary-hover transition-colors"
             onClick={() => onAnalyze(paper.id, referenceDepth)}
           >
             Analyze

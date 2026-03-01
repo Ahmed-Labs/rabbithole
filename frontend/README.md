@@ -45,9 +45,10 @@ Before using the frontend, ensure the Flask backend is running:
      ```
      If it is your first time running, run this instead:
      ```bash
-     docker compose up -d --build web  
+     docker compose up -d --build web
      ```
    - **Option B: Run locally**:
+
      ```bash
      # Install Python dependencies (do this on a virtual environment preferably)
      pip install -r requirements.txt

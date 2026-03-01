@@ -2,8 +2,6 @@ import { Routes, Route } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { FlowPage } from "./pages/FlowPage";
-import "./App.css";
-
 function App() {
   return (
     <Routes>
