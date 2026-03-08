@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ReactFlow,
@@ -8,132 +8,139 @@ import {
 } from "@xyflow/react";
 import type {
   Edge,
-  NodeTypes,
   NodeMouseHandler,
   OnNodesChange,
+  ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import dagre from "dagre";
-import { MOCK_GRAPH } from "../../mocks/mockGraph";
-import type { GraphData, PaperFlowNode, PaperNodeData } from "../types/graph";
-import { PaperNode } from "../components/PaperNode";
+
+import type {
+  GraphResponse,
+  PaperFlowNode,
+  PaperNodeData,
+} from "../types/graph";
 import { relevanceColor } from "../utils/relevanceColor";
 import { DetailPanel } from "../components/DetailPanel";
 import { Legend } from "../components/Legend";
 import { FlowControls } from "../components/FlowControls";
 import { FlowHeader } from "../components/FlowHeader";
-
-const nodeTypes: NodeTypes = { paperNode: PaperNode };
+import { nodeTypes, toCompactFlowGraph } from "../utils/graph";
 
 const NODE_W = 210;
 const NODE_H = 100;
-
-const floatStyle = `
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-4px); }
-  }
-  .paper-node-float {
-    animation: float 3s ease-in-out infinite;
-  }
-`;
-
-function toFlowGraph(schema: GraphData): {
-  nodes: PaperFlowNode[];
-  edges: Edge[];
-} {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80 });
-  g.setDefaultEdgeLabel(() => ({}));
-
-  schema.nodes.forEach((n) =>
-    g.setNode(n.id, { width: NODE_W, height: NODE_H }),
-  );
-  schema.edges.forEach((e) => g.setEdge(e.source, e.target));
-  dagre.layout(g);
-
-  const rootNode = g.node(schema.root_id);
-  const offsetX = rootNode ? rootNode.x : 0;
-  const offsetY = rootNode ? rootNode.y : 0;
-
-  const nodes: PaperFlowNode[] = schema.nodes.map((n) => {
-    const { x, y } = g.node(n.id);
-    return {
-      id: n.id,
-      type: "paperNode",
-      position: { x: x - offsetX, y: y - offsetY },
-      data: {
-        title: n.data.title,
-        year: n.data.year,
-        citation_count: n.data.citation_count,
-        relevance_score: n.data.relevance_score,
-        abstract: n.data.abstract,
-        authors: n.data.authors,
-        pdf_url: n.data.pdf_url,
-        url: n.data.url,
-        isRoot: n.data.is_root,
-        llm_explanation: n.data.llm_explanation,
-      },
-    };
-  });
-
-  const edges: Edge[] = schema.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    animated: true,
-    style: { stroke: "#3f3f46", strokeWidth: 1.5 },
-  }));
-
-  return { nodes, edges };
-}
+const INITIAL_ZOOM = 0.8;
+const DEFAULT_DEPTH = 3;
 
 export function FlowPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const paperId = searchParams.get("paperId") ?? "";
-  const depth = Number(searchParams.get("depth") ?? 3);
+  const depth = Number(searchParams.get("depth") ?? DEFAULT_DEPTH);
 
-  const { nodes: initialNodes, edges } = toFlowGraph(MOCK_GRAPH.data);
-  const [nodes, setNodes] = useState<PaperFlowNode[]>(initialNodes);
+  const [nodes, setNodes] = useState<PaperFlowNode[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedPaper, setSelectedPaper] = useState<PaperNodeData | null>(
     null,
   );
+  const [rf, setRf] = useState<ReactFlowInstance<PaperFlowNode, Edge> | null>(
+    null,
+  );
 
-  const onNodesChange: OnNodesChange<PaperFlowNode> = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+  const onNodesChange: OnNodesChange<PaperFlowNode> = useCallback((changes) => {
+    setNodes((curr) => applyNodeChanges(changes, curr));
+  }, []);
+
+  const onNodeClick: NodeMouseHandler<PaperFlowNode> = useCallback(
+    (_e, node) => {
+      setSelectedPaper(node.data);
+    },
     [],
   );
 
-  const onNodeClick: NodeMouseHandler = useCallback((_e, node) => {
-    setSelectedPaper((node as unknown as PaperFlowNode).data);
-  }, []);
+  useEffect(() => {
+    if (!paperId) {
+      setNodes([]);
+      setEdges([]);
+      setSelectedPaper(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function load() {
+      try {
+        const qs = new URLSearchParams({
+          max_depth: String(depth),
+        });
+
+        const url = `/api/graph/${encodeURIComponent(paperId)}?${qs.toString()}`;
+
+        const res = await fetch(url, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch graph: ${res.status}`);
+        }
+
+        const { data }: GraphResponse = await res.json();
+        const { nodes: flowNodes, edges: flowEdges } = toCompactFlowGraph(data);
+
+        setNodes(flowNodes);
+        setEdges(flowEdges);
+        setSelectedPaper(null);
+
+        const root = flowNodes.find((node) => node.data.isRoot);
+        if (rf && root) {
+          const centerX = root.position.x + NODE_W / 2;
+          const centerY = root.position.y + NODE_H / 2;
+
+          requestAnimationFrame(() => {
+            rf.setCenter(centerX, centerY, {
+              zoom: INITIAL_ZOOM,
+              duration: 0,
+            });
+          });
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        console.error(e);
+        setNodes([]);
+        setEdges([]);
+        setSelectedPaper(null);
+      }
+    }
+
+    load();
+
+    return () => controller.abort();
+  }, [paperId, depth, rf]);
 
   return (
     <>
       <style>{floatStyle}</style>
-      <div className="h-screen flex flex-col bg-[var(--color-page-bg)] text-white">
+
+      <div className="h-screen flex flex-col bg-page-bg text-white">
         <FlowHeader onBack={() => navigate(-1)} />
 
-        <div className="flex-1 min-h-0 m-6 rounded-lg overflow-hidden bg-[var(--color-input-bg-dark)] flex flex-col relative">
-          <ReactFlow
+        <div className="relative m-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
+          <ReactFlow<PaperFlowNode, Edge>
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeClick={onNodeClick}
-            fitView
+            onInit={setRf}
+            autoPanOnNodeFocus={false}
           >
             <Background color="var(--color-border-default)" gap={20} />
             <FlowControls />
             <Legend />
             <MiniMap
-              className="!bg-[var(--color-panel-bg)] !border !border-zinc-700 rounded-lg"
-              nodeColor={(node) => {
-                const d = (node as unknown as PaperFlowNode).data;
-                return d.isRoot ? "#818cf8" : relevanceColor(d.relevance_score);
-              }}
+              className="bg-panel-bg! border! border-zinc-700! rounded-lg"
+              nodeColor={getNodeColor}
               nodeStrokeWidth={0}
               maskColor="rgba(9,13,20,0.6)"
             />
@@ -150,3 +157,20 @@ export function FlowPage() {
     </>
   );
 }
+
+function getNodeColor(node: { data?: unknown }) {
+  const data = node.data as PaperNodeData | undefined;
+  if (!data) return "#71717a";
+  return data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
+}
+
+const floatStyle = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
+  }
+
+  .paper-node-float {
+    animation: float 3s ease-in-out infinite;
+  }
+`;
