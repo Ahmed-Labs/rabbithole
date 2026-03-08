@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import rabbitLogo from "../assets/rabbit-logo.png";
 import type { Paper } from "../types/Paper";
 import { PaperCard } from "../components/PaperCard";
 import { PaperPreview } from "../components/PaperPreview";
+import { AppHeader } from "../components/AppHeader";
 
 export function ResultsPage() {
   const [searchParams] = useSearchParams();
@@ -93,62 +93,12 @@ export function ResultsPage() {
 
   return (
     <div className="h-screen flex flex-col bg-page-bg text-text">
-      <header className="sticky top-0 z-50 bg-page-bg/85 backdrop-blur border-b border-border-default">
-        <div className="px-6 py-4 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="shrink-0 cursor-pointer"
-            aria-label="Home"
-            title="Home"
-          >
-            <img src={rabbitLogo} alt="Home" className="h-8 w-auto" />
-          </button>
-
-          <form
-            className="flex-1"
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSearch();
-            }}
-          >
-            <div
-              className="
-                flex items-center gap-3
-                rounded-2xl
-                bg-panel-bg
-                border border-border-default
-                px-4 py-3
-                transition
-                hover:border-border-default/80
-                focus-within:ring-1 focus-within:ring-focus/30
-              "
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5 text-text-muted"
-                aria-hidden
-              >
-                <path
-                  fill="currentColor"
-                  d="M10 2a8 8 0 105.293 14.293l3.707 3.707a1 1 0 001.414-1.414l-3.707-3.707A8 8 0 0010 2zm-6 8a6 6 0 1110.39 3.39A6 6 0 014 10z"
-                />
-              </svg>
-
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search papers…"
-                className="
-                  w-full bg-transparent outline-none placeholder:text-placeholder
-                  focus:outline-none focus:ring-0
-                  focus-visible:outline-none focus-visible:ring-0
-                "
-              />
-            </div>
-          </form>
-        </div>
-      </header>
+      <AppHeader
+        showSearch
+        searchValue={query}
+        onSearchChange={setQuery}
+        onSearchSubmit={onSearch}
+      />
 
       <main className="flex-1 min-h-0 px-6 py-6">
         <div className="h-full min-h-0 flex gap-6">

@@ -23,8 +23,8 @@ import { relevanceColor } from "../utils/relevanceColor";
 import { DetailPanel } from "../components/DetailPanel";
 import { Legend } from "../components/Legend";
 import { FlowControls } from "../components/FlowControls";
-import { FlowHeader } from "../components/FlowHeader";
 import { nodeTypes, toCompactFlowGraph } from "../utils/graph";
+import { AppHeader } from "../components/AppHeader";
 
 const NODE_W = 210;
 const NODE_H = 100;
@@ -123,7 +123,7 @@ export function FlowPage() {
       <style>{floatStyle}</style>
 
       <div className="h-screen flex flex-col bg-page-bg text-white">
-        <FlowHeader onBack={() => navigate(-1)} />
+        <AppHeader showBack onBack={() => navigate(-1)} />
 
         <div className="relative m-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
           <ReactFlow<PaperFlowNode, Edge>
