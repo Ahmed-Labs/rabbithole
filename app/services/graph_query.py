@@ -1,3 +1,4 @@
+import heapq
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
@@ -106,13 +107,13 @@ class GraphQueryService:
                 if not frontier:
                     break
 
-                ranked = sorted(
-                    frontier,
-                    key=lambda n: relevance.get(n, float("-inf")),
-                    reverse=True,
+                selected = set(
+                    heapq.nlargest(
+                        k,
+                        frontier,
+                        key=lambda n: relevance.get(n, float("-inf")),
+                    )
                 )
-
-                selected = set(ranked[:k])
                 kept |= selected
 
                 nxt = set()
