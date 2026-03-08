@@ -19,6 +19,9 @@ class KnowledgeGraphReader:
     ) -> Optional[
         Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]
     ]:
+        # Node limit is equally split between nodes collected from both inwards and outwards traversals.
+        # Without this, we could end up with an imbalanced graph that hits the node limit in one subgraph and
+        # fully skips over the other.
         out_limit = max(1, node_limit // 2)
         in_limit = max(1, node_limit - out_limit)
 
