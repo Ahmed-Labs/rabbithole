@@ -85,6 +85,7 @@ export function ResultsPage() {
     const trimmed = query.trim();
     if (!trimmed) return;
     navigate(`/results?q=${encodeURIComponent(trimmed)}`);
+    setSelectedId(null);
   };
 
   const handleFindRelated = (paperId: string, depth: number) => {
