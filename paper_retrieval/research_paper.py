@@ -75,7 +75,7 @@ class ResearchPaper:
         out.extend((c.id, self.id) for c in self.citations)
         return out
 
-    def to_props(self) -> dict[str, Any]:
+    def to_props(self, nested_objects: bool = False) -> dict[str, Any]:
         return {
             "id": self.id,
             "url": self.url,
@@ -87,7 +87,7 @@ class ResearchPaper:
             "authors": [
                 json.dumps(a) if isinstance(a, dict) else a
                 for a in (self.authors or [])
-            ],
+            ] if not nested_objects else self.authors,
         }
 
     @classmethod
