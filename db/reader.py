@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from db.client import Neo4jClient
 from paper_retrieval.research_paper import ResearchPaper
@@ -12,59 +12,118 @@ class KnowledgeGraphReader:
         self.client = client
 
     def read(
-        self, paper_id: str, cite_depth: int = 3
-    ) -> Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]:
-        cypher = f"""
-        MATCH (root:Paper {{id: $id}})
+        self,
+        paper_id: str,
+        depth: int = 3,
+        node_limit: int = 1000,
+    ) -> Optional[
+        Tuple[dict[str, ResearchPaper], list[RelevanceEdge], list[CitationEdge]]
+    ]:
+        # Node limit is equally split between nodes collected from both inwards and outwards traversals.
+        # Without this, we could end up with an imbalanced graph that hits the node limit in one subgraph and
+        # fully skips over the other.
+        out_limit = max(1, node_limit // 2)
+        in_limit = max(1, node_limit - out_limit)
 
-        OPTIONAL MATCH p1 = (root)-[:CITES*1..{cite_depth}]-(c)
-        OPTIONAL MATCH p2 = (root)-[:RELEVANT_TO]-(r)
+        citation_query = """
+        MATCH (root:Paper {id: $id})
+
+        CALL (root) {
+        CALL apoc.path.expandConfig(root, {
+            relationshipFilter: "CITES>",
+            minLevel: 1,
+            maxLevel: $depth,
+            bfs: true,
+            uniqueness: "NODE_GLOBAL",
+            limit: $out_limit
+        })
+        YIELD path
+        RETURN
+            collect(DISTINCT last(nodes(path))) AS outNodes,
+            apoc.coll.toSet(apoc.coll.flatten(collect(relationships(path)))) AS outRels
+        }
+
+        CALL (root) {
+        CALL apoc.path.expandConfig(root, {
+            relationshipFilter: "<CITES",
+            minLevel: 1,
+            maxLevel: $depth,
+            bfs: true,
+            uniqueness: "NODE_GLOBAL",
+            limit: $in_limit
+        })
+        YIELD path
+        RETURN
+            collect(DISTINCT last(nodes(path))) AS inNodes,
+            apoc.coll.toSet(apoc.coll.flatten(collect(relationships(path)))) AS inRels
+        }
 
         WITH
-        [p IN collect(p1) WHERE p IS NOT NULL] +
-        [p IN collect(p2) WHERE p IS NOT NULL] AS ps,
-        root
-
-        WITH
-        apoc.coll.toSet(apoc.coll.flatten([p IN ps | relationships(p)])) AS rels,
-        root
-
-        WITH
-        rels,
-        apoc.coll.toSet(
-            [root] +
-            [e IN rels | startNode(e)] +
-            [e IN rels | endNode(e)]
-        ) AS ns
+        apoc.coll.toSet(coalesce(outNodes, []) + coalesce(inNodes, []) + [root]) AS ns,
+        apoc.coll.toSet(coalesce(outRels, []) + coalesce(inRels, [])) AS citeRels
 
         RETURN
-        [n IN ns | n {{.*, id: n.id }}] AS nodes,
-        [e IN rels | {{
+        [n IN ns | n{.*, id: n.id}] AS nodes,
+        [e IN citeRels | {
             type: type(e),
             src: startNode(e).id,
             dest: endNode(e).id,
             props: properties(e)
-        }}] AS edges
+        }] AS citationEdges,
+        [n IN ns | n.id] AS nodeIds
         """
 
-        rows = self.client.run_read(cypher, {"id": paper_id})
+        relevance_query = """
+        MATCH (root:Paper {id: $id})
+        MATCH (root)-[re:RELEVANT_TO]-(r:Paper)
+        WHERE r.id IN $nodeIds
+        RETURN
+          type(re) AS type,
+          startNode(re).id AS src,
+          endNode(re).id AS dest,
+          properties(re) AS props
+        """
+
+        rows = self.client.run_read(
+            citation_query,
+            {
+                "id": paper_id,
+                "depth": depth,
+                "out_limit": out_limit,
+                "in_limit": in_limit,
+            },
+        )
+
         if not rows:
+            root_rows = self.client.run_read(
+                "MATCH (p:Paper {id: $id}) RETURN p{.*, id:p.id} AS node",
+                {"id": paper_id},
+            )
+            if not root_rows:
+                return None
+            root_paper = ResearchPaper.from_props(root_rows[0]["node"])
+            return {root_paper.id: root_paper}, [], []
+
+        data = rows[0] or {}
+        node_props: List[dict] = data.get("nodes") or []
+        node_ids: List[str] = data.get("nodeIds") or []
+        cite_edges_raw: List[dict] = data.get("citationEdges") or []
+
+        if not node_props or not node_ids:
             return None
 
-        data = rows[0]
-        nodes: list[dict] = data.get("nodes", [])
-        edges: list[dict] = data.get("edges", [])
+        rel_rows = (
+            self.client.run_read(
+                relevance_query,
+                {"id": paper_id, "nodeIds": node_ids},
+            )
+            or []
+        )
 
-        papers = [ResearchPaper.from_props(p) for p in nodes]
-        papers_by_id = {paper.id: paper for paper in papers}
+        papers = [ResearchPaper.from_props(p) for p in node_props]
+        papers_by_id = {p.id: p for p in papers}
 
-        relevance_edges, citation_edges = [], []
-
-        for edge in edges:
-            edge_type = edge.get("type")
-            if edge_type == "RELEVANT_TO":
-                relevance_edges.append(RelevanceEdge.from_props(edge))
-            elif edge_type == "CITES":
-                citation_edges.append(CitationEdge.from_props(edge))
+        citation_edges = [CitationEdge.from_props(e) for e in cite_edges_raw]
+        relevance_edges = [RelevanceEdge.from_props(e) for e in rel_rows]
 
         return papers_by_id, relevance_edges, citation_edges
