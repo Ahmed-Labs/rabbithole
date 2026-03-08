@@ -1,59 +1,56 @@
 import type { Paper } from "../types/Paper";
 
-interface PaperCardProps {
+export function PaperCard({
+  paper,
+  isSelected,
+  onClick,
+}: {
   paper: Paper;
   isSelected: boolean;
   onClick: () => void;
-}
-
-export function PaperCard({ paper, isSelected, onClick }: PaperCardProps) {
-  const category = paper.authors[0]?.name || "Unknown";
-  const year = paper.year || "N/A";
-  const citations = paper.citationCount || 0;
-
+}) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
       className={[
-        "p-4 rounded-lg cursor-pointer transition-colors flex items-start justify-between gap-3",
-        "bg-card-bg border hover:bg-zinc-800",
-        isSelected
-          ? "border-2 border-border-accent"
-          : "border border-border-default",
+        "w-full text-left rounded-2xl cursor-pointer",
+        "px-4 py-3 transition",
+        "bg-content-bg/6",
+        "hover:bg-content-bg/12",
+        "focus-visible:ring-2 focus-visible:ring-focus/40",
+        isSelected ? "bg-content-bg/14" : "",
       ].join(" ")}
     >
-      <div className="flex-1 min-w-0">
-        <h3 className="text-text font-medium mb-2 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
-          {paper.title}
-        </h3>
-        <p className="text-text-muted text-sm">
-          {category} • {year} • {citations} cites
-        </p>
+      <div className="flex items-start gap-3">
+        <div
+          className={[
+            "mt-1 h-8 w-1 rounded-full",
+            isSelected ? "bg-primary" : "bg-border-default/40",
+          ].join(" ")}
+          aria-hidden
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium leading-snug line-clamp-2">
+            {paper.title}
+          </div>
+
+          <div className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+            <span className="tabular-nums">{paper.year ?? "—"}</span>
+            <span className="opacity-50">•</span>
+            <span className="tabular-nums">
+              {paper.citationCount ?? 0} citations
+            </span>
+            {paper.pdfUrl ? (
+              <>
+                <span className="opacity-50">•</span>
+                <span>PDF</span>
+              </>
+            ) : null}
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            // CITES functionality - placeholder
-          }}
-          className="px-3 py-1.5 text-xs bg-input-bg-dark text-text rounded cursor-pointer transition-colors whitespace-nowrap hover:bg-[#0d141f]"
-        >
-          CITES
-        </button>
-        {paper.pdfUrl && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(paper.pdfUrl!, "_blank");
-            }}
-            className="px-3 py-1.5 text-xs bg-input-bg-dark text-text rounded cursor-pointer transition-colors whitespace-nowrap hover:bg-[#0d141f]"
-          >
-            OPEN PDF
-          </button>
-        )}
-      </div>
-    </div>
+    </button>
   );
 }

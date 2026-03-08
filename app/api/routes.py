@@ -27,7 +27,7 @@ def search_papers():
     limit = 10
 
     papers = search(query, limit=limit)
-    papers_data = [paper.to_props() for paper in papers]
+    papers_data = [paper.to_props(nested_objects=True) for paper in papers]
 
     return jsonify({"papers": papers_data})
 
@@ -152,7 +152,6 @@ def get_graph(paper_id: str):
         task = generate_llm_score.delay(p1.to_props(), targets)
 
         task_data["task_id"] = task.id
-        task_data["status"] = "queued"
 
     graph_data = ReactFlowFormatter.format_graph(
         papers, relevance_edges, citation_edges, root_id=paper_id

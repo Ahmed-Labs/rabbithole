@@ -39,7 +39,11 @@ export interface GraphSchema {
   data: GraphData;
 }
 
-export type PaperNodeData = Record<string, unknown> & {
+export type GraphResponse = GraphSchema & {
+  task_id?: string;
+};
+
+export type PaperNodeData = {
   title: string;
   year: number;
   citation_count: number;

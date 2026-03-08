@@ -9,7 +9,7 @@ interface DetailPanelProps {
 export function DetailPanel({ data, onClose }: DetailPanelProps) {
   const color = data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
   return (
-    <div className="absolute top-0 right-0 h-full w-80 bg-[var(--color-panel-bg)] border-l border-zinc-700 flex flex-col z-10 overflow-hidden">
+    <div className="absolute top-0 right-0 h-full w-80 bg-panel-bg border-l border-zinc-700 flex flex-col z-10 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
         <span className="text-sm font-semibold text-white">Paper details</span>
         <button

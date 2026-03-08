@@ -100,7 +100,7 @@ class KnowledgeGraphReader:
                 {"id": paper_id},
             )
             if not root_rows:
-                return None
+                return {}, [], []
             root_paper = ResearchPaper.from_props(root_rows[0]["node"])
             return {root_paper.id: root_paper}, [], []
 
@@ -110,7 +110,7 @@ class KnowledgeGraphReader:
         cite_edges_raw: List[dict] = data.get("citationEdges") or []
 
         if not node_props or not node_ids:
-            return None
+            return {}, [], []
 
         rel_rows = (
             self.client.run_read(

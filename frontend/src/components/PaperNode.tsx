@@ -8,7 +8,7 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
   const floatDelay = `${(data.title.length % 20) * 0.1}s`;
   return (
     <div
-      className="rounded-lg bg-[var(--color-card-bg)] text-white text-xs w-52 cursor-pointer paper-node-float"
+      className="rounded-lg bg-card-bg text-white text-xs w-52 cursor-pointer paper-node-float"
       style={{ border: `2px solid ${color}`, animationDelay: floatDelay }}
     >
       <Handle

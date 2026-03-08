@@ -3,102 +3,129 @@ import type { Paper } from "../types/Paper";
 
 interface PaperPreviewProps {
   paper: Paper | null;
-  onAnalyze: (paperId: string, depth: number) => void;
+  onFindRelated: (paperId: string, depth: number) => void;
 }
 
-export function PaperPreview({ paper, onAnalyze }: PaperPreviewProps) {
-  const [referenceDepth, setReferenceDepth] = useState(2);
-  const [includeCitations, setIncludeCitations] = useState(false);
+const DEFAULT_DEPTH = 2;
+const MAX_DEPTH = 5;
+
+export function PaperPreview({ paper, onFindRelated }: PaperPreviewProps) {
+  const [depth, setDepth] = useState(DEFAULT_DEPTH);
 
   if (!paper) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center text-placeholder">
-        Select a paper to view details
+      <div className="h-full min-h-0 flex items-center justify-center text-text-muted">
+        Select a paper
       </div>
     );
   }
 
+  const { id, title, year, citationCount, authors, pdfUrl, url, abstract } =
+    paper;
+
+  const authorText = authors?.length
+    ? authors.map((a) => a.name).join(", ")
+    : null;
+
   return (
-    <div className="flex flex-col">
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold text-text mb-4">
-          Root paper preview
-        </h2>
-        <h3 className="text-xl font-semibold text-text mb-3">{paper.title}</h3>
+    <div className="h-full min-h-0 overflow-y-auto">
+      <div className="sticky top-0 z-10 bg-panel-bg/92 backdrop-blur border-b border-border-default">
+        <div className="px-6 pt-5 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs text-text-muted">
+                {year ?? "—"} • {citationCount ?? 0} citations
+              </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
-            {paper.year || "N/A"}
-          </span>
-          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
-            IEEE
-          </span>
-          <span className="px-3 py-1 bg-panel-bg text-text-secondary rounded-full text-sm">
-            {paper.citationCount} citations
-          </span>
-        </div>
+              <h2 className="mt-2 text-lg sm:text-xl font-semibold leading-snug line-clamp-2">
+                {title}
+              </h2>
 
-        <div className="mb-4 p-4 bg-panel-bg rounded-lg">
-          <h3 className="text-text font-medium mb-2">Abstract</h3>
-          <p className="text-text-secondary text-sm leading-7">
-            {paper.abstract || "No abstract available."}
-          </p>
+              {authorText && (
+                <div className="mt-1 text-sm text-text-secondary line-clamp-1">
+                  {authorText}
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-xl border border-border-default bg-card-bg px-3 py-2">
+                <span className="text-xs text-text-muted">Search depth</span>
+
+                <select
+                  value={depth}
+                  onChange={(e) => setDepth(Number(e.target.value))}
+                  className="bg-transparent outline-none text-sm text-text cursor-pointer scheme-dark"
+                >
+                  {Array.from({ length: MAX_DEPTH }, (_, i) => {
+                    const d = i + 1;
+                    return (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onFindRelated(id, depth)}
+                className="
+                  cursor-pointer px-4 py-2.5 rounded-xl
+                  bg-primary/15 text-primary
+                  text-sm font-semibold
+                  transition
+                  hover:bg-primary/25
+                  active:translate-y-[0.5px]
+                  focus-visible:ring-2 focus-visible:ring-focus/40
+                "
+              >
+                Find related papers
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            {pdfUrl && (
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={secondaryBtnClass}
+              >
+                Open PDF
+              </a>
+            )}
+
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className={secondaryBtnClass}
+            >
+              View source
+            </a>
+          </div>
         </div>
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold text-text mb-4">
-          Analysis options
-        </h2>
+      <div className="px-6 py-5">
+        <div className="text-sm font-medium mb-3">Abstract</div>
 
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-text-secondary mb-2">
-              Reference depth:
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={5}
-              value={referenceDepth}
-              onChange={(e) => setReferenceDepth(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-panel-bg border border-border-default rounded text-text focus:outline-none focus:ring-2 focus:ring-focus"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <label className="text-sm text-text-secondary">
-              Include papers that cite this paper
-            </label>
-            <button
-              type="button"
-              onClick={() => setIncludeCitations(!includeCitations)}
-              className={[
-                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer",
-                includeCitations ? "bg-focus" : "bg-border-default",
-              ].join(" ")}
-              aria-pressed={includeCitations}
-            >
-              <span
-                className={[
-                  "inline-block h-5 w-5 transform rounded-full bg-white transition-transform",
-                  includeCitations ? "translate-x-5" : "translate-x-1",
-                ].join(" ")}
-              />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            className="px-8 py-3 bg-primary text-text font-medium rounded-full cursor-pointer hover:bg-primary-hover transition-colors"
-            onClick={() => onAnalyze(paper.id, referenceDepth)}
-          >
-            Analyze
-          </button>
-        </div>
+        <p className="text-sm text-text-secondary leading-7 whitespace-pre-wrap">
+          {abstract || "No abstract available."}
+        </p>
       </div>
     </div>
   );
 }
+
+const secondaryBtnClass =
+  "inline-flex items-center gap-2 cursor-pointer " +
+  "px-3 py-2 rounded-xl text-sm font-medium " +
+  "bg-card-bg border border-border-default " +
+  "text-text-secondary transition " +
+  "hover:bg-content-bg/30 hover:text-text hover:border-border-default/80 " +
+  "active:translate-y-[0.5px] " +
+  "focus-visible:ring-2 focus-visible:ring-focus/35";
