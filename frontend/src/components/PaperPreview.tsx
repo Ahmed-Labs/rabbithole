@@ -55,7 +55,7 @@ export function PaperPreview({ paper, onFindRelated }: PaperPreviewProps) {
                 <select
                   value={depth}
                   onChange={(e) => setDepth(Number(e.target.value))}
-                  className="bg-transparent outline-none text-sm text-text cursor-pointer"
+                  className="bg-transparent outline-none text-sm text-text cursor-pointer scheme-dark"
                 >
                   {Array.from({ length: MAX_DEPTH }, (_, i) => {
                     const d = i + 1;
