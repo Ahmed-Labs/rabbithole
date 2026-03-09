@@ -45,10 +45,13 @@ export function FlowPage() {
   const [nodes, setNodes] = useState<PaperFlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
-  const selectedPaper = nodes.find((n) => n.id === selectedPaperId)?.data ?? null;
+  const selectedPaper =
+    nodes.find((n) => n.id === selectedPaperId)?.data ?? null;
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
-  const [rf, setRf] = useState<ReactFlowInstance<PaperFlowNode, Edge> | null>(null);
+  const [rf, setRf] = useState<ReactFlowInstance<PaperFlowNode, Edge> | null>(
+    null,
+  );
 
   const taskIdRef = useRef<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,9 +61,12 @@ export function FlowPage() {
     setNodes((curr) => applyNodeChanges(changes, curr));
   }, []);
 
-  const onNodeClick: NodeMouseHandler<PaperFlowNode> = useCallback((_e, node) => {
-    setSelectedPaperId(node.id);
-  }, []);
+  const onNodeClick: NodeMouseHandler<PaperFlowNode> = useCallback(
+    (_e, node) => {
+      setSelectedPaperId(node.id);
+    },
+    [],
+  );
 
   // Mark nodes that got new llm_explanation with isUpdated, then clear after flash
   function applyUpdatedFlash(
@@ -79,7 +85,9 @@ export function FlowPage() {
     setTimeout(() => {
       setNodes((curr) =>
         curr.map((n) =>
-          n.data.isUpdated ? { ...n, data: { ...n.data, isUpdated: false } } : n,
+          n.data.isUpdated
+            ? { ...n, data: { ...n.data, isUpdated: false } }
+            : n,
         ),
       );
     }, UPDATED_FLASH_MS);
@@ -87,7 +95,10 @@ export function FlowPage() {
     return withFlash;
   }
 
-  function centerOnRoot(flowNodes: PaperFlowNode[], instance: ReactFlowInstance<PaperFlowNode, Edge>) {
+  function centerOnRoot(
+    flowNodes: PaperFlowNode[],
+    instance: ReactFlowInstance<PaperFlowNode, Edge>,
+  ) {
     const root = flowNodes.find((n) => n.data.isRoot);
     if (!root) return;
     const cx = root.position.x + NODE_W / 2;
@@ -100,10 +111,10 @@ export function FlowPage() {
   // Refetch after task completes, diff against current nodes to flash updated ones
   async function refetchAfterTask(signal: AbortSignal) {
     const qs = new URLSearchParams({ max_depth: String(depth) });
-    const res = await fetch(
-      `/api/graph/${encodeURIComponent(paperId)}?${qs}`,
-      { headers: { Accept: "application/json" }, signal },
-    );
+    const res = await fetch(`/api/graph/${encodeURIComponent(paperId)}?${qs}`, {
+      headers: { Accept: "application/json" },
+      signal,
+    });
     if (!res.ok) return;
 
     const { data }: GraphResponse = await res.json();
@@ -122,7 +133,10 @@ export function FlowPage() {
     pollTimerRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/task-status/${taskId}`, { signal });
-        if (!res.ok) { setTaskStatus("failed"); return; }
+        if (!res.ok) {
+          setTaskStatus("failed");
+          return;
+        }
 
         const json = await res.json();
 
@@ -144,7 +158,9 @@ export function FlowPage() {
   // Main load effect
   useEffect(() => {
     if (!paperId) {
-      setNodes([]); setEdges([]); setSelectedPaperId(null);
+      setNodes([]);
+      setEdges([]);
+      setSelectedPaperId(null);
       return;
     }
 
@@ -162,7 +178,10 @@ export function FlowPage() {
         const qs = new URLSearchParams({ max_depth: String(depth) });
         const res = await fetch(
           `/api/graph/${encodeURIComponent(paperId)}?${qs}`,
-          { headers: { Accept: "application/json" }, signal: controller.signal },
+          {
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          },
         );
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -196,7 +215,9 @@ export function FlowPage() {
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         console.error(e);
-        setNodes([]); setEdges([]); setSelectedPaperId(null);
+        setNodes([]);
+        setEdges([]);
+        setSelectedPaperId(null);
       }
     }
 

@@ -20,16 +20,24 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
       className={classNames}
       style={{ border: `2px solid ${color}`, animationDelay: floatDelay }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: color, border: "none" }} />
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ background: color, border: "none" }}
+      />
       <div className="h-1 rounded-t-md" style={{ background: color }} />
 
       <div className="p-3 flex flex-col gap-1">
-        <p className="font-semibold leading-snug line-clamp-3 text-[11px]">{data.title}</p>
+        <p className="font-semibold leading-snug line-clamp-3 text-[11px]">
+          {data.title}
+        </p>
         <div className="flex items-center justify-between mt-1">
           <span className="text-zinc-400 text-[10px]">{data.year}</span>
           <div className="flex items-center gap-1">
             {data.isPending && (
-              <span className="text-[9px] text-violet-400 animate-pulse">AI</span>
+              <span className="text-[9px] text-violet-400 animate-pulse">
+                AI
+              </span>
             )}
             {!data.isRoot && (
               <span
@@ -48,7 +56,11 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} style={{ background: color, border: "none" }} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ background: color, border: "none" }}
+      />
     </div>
   );
 });
