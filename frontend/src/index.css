@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-page-bg: #0b0f14;        /* near-neutral charcoal */
-  --color-panel-bg: #0f1620;       /* primary surface */
-  --color-card-bg: #111b26;        /* slightly elevated */
-  --color-content-bg: #0f1924;     /* secondary surface */
-  --color-input-bg: #0c141d;       /* input surface */
-  --color-input-bg-dark: #0a1119;  /* deeper input */
+  --color-page-bg: #0b0f14; /* near-neutral charcoal */
+  --color-panel-bg: #0f1620; /* primary surface */
+  --color-card-bg: #111b26; /* slightly elevated */
+  --color-content-bg: #0f1924; /* secondary surface */
+  --color-input-bg: #0c141d; /* input surface */
+  --color-input-bg-dark: #0a1119; /* deeper input */
 
   --color-border-default: rgba(255, 255, 255, 0.08);
 
@@ -17,7 +17,7 @@
   --color-text-muted: rgba(255, 255, 255, 0.55);
   --color-placeholder: rgba(255, 255, 255, 0.38);
 
-  --color-primary: rgb(249 115 22);       /* orange-500 */
+  --color-primary: rgb(249 115 22); /* orange-500 */
   --color-primary-hover: rgb(251 146 60); /* orange-400 */
 
   --color-focus: rgba(249, 115, 22, 0.35);
@@ -38,7 +38,10 @@ body,
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   overscroll-behavior: none;
 }
 

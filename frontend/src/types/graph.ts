@@ -35,15 +35,12 @@ export interface GraphData {
   root_id: string;
 }
 
-export interface GraphSchema {
+export interface GraphResponse {
   data: GraphData;
+  task_id?: string;
 }
 
-export type GraphResponse = GraphSchema & {
-  task_id?: string;
-};
-
-export type PaperNodeData = {
+export type PaperNodeData = Record<string, unknown> & {
   title: string;
   year: number;
   citation_count: number;
@@ -54,6 +51,8 @@ export type PaperNodeData = {
   url: string;
   isRoot: boolean;
   llm_explanation: string | null;
+  isPending: boolean;
+  isUpdated: boolean;
 };
 
 export type PaperFlowNode = Node<PaperNodeData, "paperNode">;
