@@ -173,7 +173,7 @@ export function FlowPage() {
         // Mark nodes without llm_explanation as pending if a task is running
         const pending = task_id
           ? flowNodes.map((n) =>
-              n.data.llm_explanation == null
+              !n.data.isRoot && n.data.llm_explanation == null
                 ? { ...n, data: { ...n.data, isPending: true } }
                 : n,
             )
