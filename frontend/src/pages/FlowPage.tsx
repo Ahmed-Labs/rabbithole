@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ReactFlow,
@@ -25,6 +25,10 @@ import { Legend } from "../components/Legend";
 import { FlowControls } from "../components/FlowControls";
 import { nodeTypes, toCompactFlowGraph } from "../utils/graph";
 import { AppHeader } from "../components/AppHeader";
+import {
+  FilterSidebar,
+  type FlowFilters,
+} from "../components/FilterSidebar";
 
 const NODE_W = 210;
 const NODE_H = 100;
@@ -33,7 +37,66 @@ const DEFAULT_DEPTH = 3;
 const POLL_INTERVAL_MS = 2500;
 const UPDATED_FLASH_MS = 2000;
 
+const DEFAULT_FLOW_FILTERS: FlowFilters = {
+  searchQuery: "",
+  searchEnabled: true,
+  yearMin: 1900,
+  yearMax: new Date().getFullYear(),
+  yearEnabled: false,
+  minCitations: 0,
+  citationsEnabled: false,
+  minRelevance: 0,
+  similarityEnabled: false,
+};
+
 type TaskStatus = "idle" | "polling" | "done" | "failed";
+
+function buildGraphQueryString(
+  depth: number,
+  filters: FlowFilters,
+): URLSearchParams {
+  const qs = new URLSearchParams({ max_depth: String(depth) });
+  if (filters.yearEnabled && filters.yearMin != null)
+    qs.set("min_year", String(filters.yearMin));
+  if (filters.yearEnabled && filters.yearMax != null)
+    qs.set("max_year", String(filters.yearMax));
+  if (filters.citationsEnabled && filters.minCitations != null)
+    qs.set("min_citations", String(filters.minCitations));
+  if (filters.similarityEnabled && filters.minRelevance != null)
+    qs.set("min_relevance", String(filters.minRelevance));
+  return qs;
+}
+
+function filterVisibleBySearch(
+  nodes: PaperFlowNode[],
+  edges: Edge[],
+  searchQuery: string,
+  searchEnabled: boolean,
+): { visibleNodes: PaperFlowNode[]; visibleEdges: Edge[] } {
+  if (!searchEnabled) {
+    return { visibleNodes: nodes, visibleEdges: edges };
+  }
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) {
+    return { visibleNodes: nodes, visibleEdges: edges };
+  }
+  const visibleIds = new Set(
+    nodes
+      .filter((n) => {
+        const titleMatch = n.data.title?.toLowerCase().includes(q);
+        const authorMatch = n.data.authors?.some((a) =>
+          a.name?.toLowerCase().includes(q),
+        );
+        return titleMatch || authorMatch;
+      })
+      .map((n) => n.id),
+  );
+  const visibleNodes = nodes.filter((n) => visibleIds.has(n.id));
+  const visibleEdges = edges.filter(
+    (e) => visibleIds.has(e.source) && visibleIds.has(e.target),
+  );
+  return { visibleNodes, visibleEdges };
+}
 
 export function FlowPage() {
   const [searchParams] = useSearchParams();
@@ -45,6 +108,9 @@ export function FlowPage() {
   const [nodes, setNodes] = useState<PaperFlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FLOW_FILTERS);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   const selectedPaper =
     nodes.find((n) => n.id === selectedPaperId)?.data ?? null;
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
@@ -53,9 +119,29 @@ export function FlowPage() {
     null,
   );
 
+  const { visibleNodes, visibleEdges } = useMemo(
+    () =>
+      filterVisibleBySearch(
+        nodes,
+        edges,
+        filters.searchQuery,
+        filters.searchEnabled,
+      ),
+    [nodes, edges, filters.searchQuery, filters.searchEnabled],
+  );
+
+  // Clear selection when selected node is filtered out by search
+  useEffect(() => {
+    if (!selectedPaperId) return;
+    const isVisible = visibleNodes.some((n) => n.id === selectedPaperId);
+    if (!isVisible) setSelectedPaperId(null);
+  }, [visibleNodes, selectedPaperId]);
+
   const taskIdRef = useRef<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   const onNodesChange: OnNodesChange<PaperFlowNode> = useCallback((changes) => {
     setNodes((curr) => applyNodeChanges(changes, curr));
@@ -110,7 +196,7 @@ export function FlowPage() {
 
   // Refetch after task completes, diff against current nodes to flash updated ones
   async function refetchAfterTask(signal: AbortSignal) {
-    const qs = new URLSearchParams({ max_depth: String(depth) });
+    const qs = buildGraphQueryString(depth, filtersRef.current);
     const res = await fetch(`/api/graph/${encodeURIComponent(paperId)}?${qs}`, {
       headers: { Accept: "application/json" },
       signal,
@@ -175,7 +261,7 @@ export function FlowPage() {
 
     async function load() {
       try {
-        const qs = new URLSearchParams({ max_depth: String(depth) });
+        const qs = buildGraphQueryString(depth, filters);
         const res = await fetch(
           `/api/graph/${encodeURIComponent(paperId)}?${qs}`,
           {
@@ -227,7 +313,7 @@ export function FlowPage() {
       controller.abort();
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
-  }, [paperId, depth, rf]);
+  }, [paperId, depth, filters.yearMin, filters.yearMax, filters.yearEnabled, filters.minCitations, filters.citationsEnabled, filters.minRelevance, filters.similarityEnabled, rf]);
 
   return (
     <>
@@ -236,10 +322,71 @@ export function FlowPage() {
       <div className="h-screen flex flex-col bg-page-bg text-white">
         <AppHeader showBack onBack={() => navigate(-1)} />
 
-        <div className="relative m-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
+        <div className="m-6 flex min-h-0 flex-1 gap-4">
+          {/* Filter sidebar (collapsible) */}
+          <div
+            className="flex shrink-0 flex-col transition-[width] duration-200 ease-out overflow-hidden"
+            style={{ width: sidebarOpen ? 280 : 0 }}
+          >
+            {sidebarOpen ? (
+              <div className="w-[280px] h-full min-h-0">
+                <FilterSidebar filters={filters} onFiltersChange={setFilters} />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Toggle filter sidebar */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label={sidebarOpen ? "Close filters" : "Open filters"}
+            aria-expanded={sidebarOpen}
+            title={sidebarOpen ? "Close filters" : "Open filters"}
+            className="
+              shrink-0 self-center w-9 h-9 rounded-xl
+              flex items-center justify-center
+              bg-panel-bg border border-border-default
+              text-text-muted hover:text-text hover:border-border-accent
+              transition focus-visible:ring-2 focus-visible:ring-focus/40
+            "
+          >
+            {sidebarOpen ? (
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                />
+              </svg>
+            )}
+          </button>
+
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
           <ReactFlow<PaperFlowNode, Edge>
-            nodes={nodes}
-            edges={edges}
+            nodes={visibleNodes}
+            edges={visibleEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeClick={onNodeClick}
@@ -278,6 +425,7 @@ export function FlowPage() {
               onClose={() => setSelectedPaperId(null)}
             />
           )}
+          </div>
         </div>
       </div>
     </>
