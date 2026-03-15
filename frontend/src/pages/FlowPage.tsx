@@ -72,14 +72,26 @@ function filterVisibleBySearch(
   edges: Edge[],
   searchQuery: string,
   searchEnabled: boolean,
-): { visibleNodes: PaperFlowNode[]; visibleEdges: Edge[] } {
+): {
+  displayNodes: PaperFlowNode[];
+  displayEdges: Edge[];
+} {
   if (!searchEnabled) {
-    return { visibleNodes: nodes, visibleEdges: edges };
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const displayEdges = edges.filter(
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+    );
+    return { displayNodes: nodes, displayEdges };
   }
   const q = searchQuery.trim().toLowerCase();
   if (!q) {
-    return { visibleNodes: nodes, visibleEdges: edges };
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const displayEdges = edges.filter(
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+    );
+    return { displayNodes: nodes, displayEdges };
   }
+  const nodeIds = new Set(nodes.map((n) => n.id));
   const visibleIds = new Set(
     nodes
       .filter((n) => {
@@ -91,11 +103,36 @@ function filterVisibleBySearch(
       })
       .map((n) => n.id),
   );
-  const visibleNodes = nodes.filter((n) => visibleIds.has(n.id));
-  const visibleEdges = edges.filter(
-    (e) => visibleIds.has(e.source) && visibleIds.has(e.target),
+  // Ghost: show if (1) has unfiltered child that is not the root, or (2) has unfiltered parent that is not the root.
+  const rootId = nodes.find((n) => n.data?.isRoot === true)?.id ?? null;
+  const ghostIds = new Set<string>();
+  for (const e of edges) {
+    if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) continue;
+    if (
+      visibleIds.has(e.target) &&
+      e.target !== rootId &&
+      !visibleIds.has(e.source)
+    )
+      ghostIds.add(e.source);
+    if (
+      visibleIds.has(e.source) &&
+      e.source !== rootId &&
+      !visibleIds.has(e.target)
+    )
+      ghostIds.add(e.target);
+  }
+  const displayIds = new Set([...visibleIds, ...ghostIds]);
+  const displayNodes = nodes
+    .filter((n) => displayIds.has(n.id))
+    .map((n) => {
+      const isGhost =
+        ghostIds.has(n.id) || (n.data as { isGhost?: boolean }).isGhost === true;
+      return isGhost ? { ...n, data: { ...n.data, isGhost: true } } : n;
+    });
+  const displayEdges = edges.filter(
+    (e) => displayIds.has(e.source) && displayIds.has(e.target),
   );
-  return { visibleNodes, visibleEdges };
+  return { displayNodes, displayEdges };
 }
 
 export function FlowPage() {
@@ -111,15 +148,13 @@ export function FlowPage() {
   const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FLOW_FILTERS);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const selectedPaper =
-    nodes.find((n) => n.id === selectedPaperId)?.data ?? null;
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
   const [rf, setRf] = useState<ReactFlowInstance<PaperFlowNode, Edge> | null>(
     null,
   );
 
-  const { visibleNodes, visibleEdges } = useMemo(
+  const { displayNodes, displayEdges } = useMemo(
     () =>
       filterVisibleBySearch(
         nodes,
@@ -130,12 +165,16 @@ export function FlowPage() {
     [nodes, edges, filters.searchQuery, filters.searchEnabled],
   );
 
-  // Clear selection when selected node is filtered out by search
+  const selectedNode = displayNodes.find((n) => n.id === selectedPaperId);
+  const selectedPaper = selectedNode?.data ?? null;
+  const isSelectedGhost = selectedNode?.data?.isGhost === true;
+
+  // Clear selection when selected node is no longer in the displayed graph
   useEffect(() => {
     if (!selectedPaperId) return;
-    const isVisible = visibleNodes.some((n) => n.id === selectedPaperId);
-    if (!isVisible) setSelectedPaperId(null);
-  }, [visibleNodes, selectedPaperId]);
+    const stillDisplayed = displayNodes.some((n) => n.id === selectedPaperId);
+    if (!stillDisplayed) setSelectedPaperId(null);
+  }, [displayNodes, selectedPaperId]);
 
   const taskIdRef = useRef<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,6 +358,12 @@ export function FlowPage() {
   if (filters.searchQuery.trim()) {
     filterSummaryParts.push(`Search: "${filters.searchQuery.trim()}"`);
   }
+  // Order matches sidebar: Relevance, Year, Citation
+  if (filters.similarityEnabled) {
+    filterSummaryParts.push(
+      `Relevance: ≥ ${Math.round(filters.minRelevance * 100)}%`,
+    );
+  }
   if (filters.yearEnabled) {
     filterSummaryParts.push(
       `Year: ${filters.yearMin} – ${filters.yearMax}`,
@@ -326,11 +371,6 @@ export function FlowPage() {
   }
   if (filters.citationsEnabled) {
     filterSummaryParts.push(`Citations: ≥ ${filters.minCitations}`);
-  }
-  if (filters.similarityEnabled) {
-    filterSummaryParts.push(
-      `Relevance: ≥ ${Math.round(filters.minRelevance * 100)}%`,
-    );
   }
   const filterSummary =
     "Filters Applied: " +
@@ -426,8 +466,8 @@ export function FlowPage() {
 
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
           <ReactFlow<PaperFlowNode, Edge>
-            nodes={visibleNodes}
-            edges={visibleEdges}
+            nodes={displayNodes}
+            edges={displayEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeClick={onNodeClick}
@@ -464,6 +504,7 @@ export function FlowPage() {
             <DetailPanel
               data={selectedPaper}
               onClose={() => setSelectedPaperId(null)}
+              isFilteredOut={isSelectedGhost}
             />
           )}
           </div>
@@ -476,6 +517,7 @@ export function FlowPage() {
 function getNodeColor(node: { data?: unknown }) {
   const data = node.data as PaperNodeData | undefined;
   if (!data) return "#71717a";
+  if (data.isGhost) return "#71717a";
   return data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
 }
 

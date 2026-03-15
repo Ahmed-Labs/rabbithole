@@ -75,7 +75,7 @@ export function FilterSidebar({
         ) : null}
       </div>
 
-      <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto px-4 py-4">
+      <div className="flex flex-1 min-h-0 flex-col gap-6 overflow-y-auto px-4 py-4">
         {/* Relevance — score displayed as percentage */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -109,7 +109,7 @@ export function FilterSidebar({
             </div>
           </div>
           <div
-            className={`transition-opacity ${!filters.similarityEnabled ? "opacity-50 pointer-events-none" : ""}`}
+            className={`flex flex-col gap-3 transition-opacity ${!filters.similarityEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
           <p className="text-xs text-text-muted">
             Relevance score: type a percentage (0–100) or use the slider below.
@@ -196,7 +196,7 @@ export function FilterSidebar({
             </div>
           </div>
           <div
-            className={`transition-opacity ${!filters.yearEnabled ? "opacity-50 pointer-events-none" : ""}`}
+            className={`flex flex-col gap-3 transition-opacity ${!filters.yearEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
           <p className="text-xs text-text-muted">
             Type a value or use the sliders below.
@@ -335,7 +335,7 @@ export function FilterSidebar({
             </div>
           </div>
           <div
-            className={`transition-opacity ${!filters.citationsEnabled ? "opacity-50 pointer-events-none" : ""}`}
+            className={`flex flex-col gap-3 transition-opacity ${!filters.citationsEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
           <p className="text-xs text-text-muted">
             Type a value or use the slider below.

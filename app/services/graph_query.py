@@ -25,17 +25,22 @@ class GraphQueryService:
 
     def get_filtered_graph(
         self, paper_id: str, filters: GraphFilters
-    ) -> Tuple[dict[str, ResearchPaper], List[RelevanceEdge], List[CitationEdge]]:
+    ) -> Tuple[
+        dict[str, ResearchPaper],
+        dict[str, ResearchPaper],
+        List[RelevanceEdge],
+        List[CitationEdge],
+    ]:
         papers_by_id, relevance_edges, citation_edges = self.reader.read(
             paper_id, filters.max_depth
         )
         root_paper = papers_by_id.pop(paper_id, None)
 
         if root_paper is None:
-            return {}, [], []
+            return {}, {}, [], []
 
         if not papers_by_id:
-            return {paper_id: root_paper}, [], []
+            return {paper_id: root_paper}, {}, [], []
 
         top_papers = self._top_k(
             paper_id,
@@ -60,10 +65,30 @@ class GraphQueryService:
         filtered_papers[root_paper.id] = root_paper
         filtered_ids = set(filtered_papers.keys())
 
-        filtered_relevance = self._filter_by_paper_ids(relevance_edges, filtered_ids)
-        filtered_citations = self._filter_by_paper_ids(citation_edges, filtered_ids)
+        # Ghost papers: show if (1) has an unfiltered child that is not the root (ghost -> visible, visible != root), or (2) has an unfiltered parent that is not the root (visible -> ghost, visible != root).
+        ghost_ids = set()
+        for e in citation_edges:
+            if (
+                e.dest_id in filtered_ids
+                and e.dest_id != paper_id  # child is not the root
+                and e.src_id not in filtered_ids
+                and e.src_id in papers_by_id
+            ):
+                ghost_ids.add(e.src_id)  # ghost has visible non-root child
+            if (
+                e.src_id in filtered_ids
+                and e.src_id != paper_id  # parent is not the root
+                and e.dest_id not in filtered_ids
+                and e.dest_id in papers_by_id
+            ):
+                ghost_ids.add(e.dest_id)  # ghost has visible non-root parent
+        ghost_papers = {pid: papers_by_id[pid] for pid in ghost_ids}
 
-        return filtered_papers, filtered_relevance, filtered_citations
+        display_ids = filtered_ids | ghost_ids
+        filtered_relevance = self._filter_by_paper_ids(relevance_edges, filtered_ids)
+        display_citations = self._filter_by_paper_ids(citation_edges, display_ids)
+
+        return filtered_papers, ghost_papers, filtered_relevance, display_citations
 
     def _passes_filters(self, p: ResearchPaper, filters: GraphFilters) -> bool:
         return (

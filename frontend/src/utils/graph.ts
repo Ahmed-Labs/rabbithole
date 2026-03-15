@@ -28,6 +28,7 @@ export function toFlowGraph(schema: GraphData): {
 
   const nodes: PaperFlowNode[] = schema.nodes.map((n) => {
     const { x, y } = g.node(n.id);
+    const d = n.data as { is_ghost?: boolean };
     return {
       id: n.id,
       type: "paperNode",
@@ -43,6 +44,7 @@ export function toFlowGraph(schema: GraphData): {
         url: n.data.url,
         isRoot: n.data.is_root,
         llm_explanation: n.data.llm_explanation,
+        isGhost: Boolean(d.is_ghost),
       },
     };
   });
@@ -142,6 +144,7 @@ export function toCompactFlowGraph(schema: GraphData): {
         : (g.node(n.id) as { x: number; y: number }).x -
           (rootNode ? rootNode.x : 0);
 
+    const d = n.data as { is_ghost?: boolean };
     return {
       id: n.id,
       type: "paperNode",
@@ -157,6 +160,7 @@ export function toCompactFlowGraph(schema: GraphData): {
         url: n.data.url,
         isRoot: n.data.is_root,
         llm_explanation: n.data.llm_explanation,
+        isGhost: Boolean(d.is_ghost),
       },
     };
   });
