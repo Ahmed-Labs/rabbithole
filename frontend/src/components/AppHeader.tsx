@@ -8,6 +8,7 @@ interface AppHeaderProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   onSearchSubmit?: () => void;
+  searchPlaceholder?: string;
 }
 
 export function AppHeader({
@@ -17,6 +18,7 @@ export function AppHeader({
   searchValue = "",
   onSearchChange,
   onSearchSubmit,
+  searchPlaceholder,
 }: AppHeaderProps) {
   const navigate = useNavigate();
 
@@ -67,7 +69,7 @@ export function AppHeader({
               <input
                 value={searchValue}
                 onChange={(e) => onSearchChange?.(e.target.value)}
-                placeholder="Search papers…"
+                placeholder={searchPlaceholder ?? "Search papers…"}
                 className="
                   w-full bg-transparent outline-none placeholder:text-placeholder
                   focus:outline-none focus:ring-0

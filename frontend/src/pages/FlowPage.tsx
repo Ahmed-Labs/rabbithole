@@ -315,12 +315,49 @@ export function FlowPage() {
     };
   }, [paperId, depth, filters.yearMin, filters.yearMax, filters.yearEnabled, filters.minCitations, filters.citationsEnabled, filters.minRelevance, filters.similarityEnabled, rf]);
 
+  const filterSummaryParts: string[] = [];
+  if (filters.searchQuery.trim()) {
+    filterSummaryParts.push(`Search: "${filters.searchQuery.trim()}"`);
+  }
+  if (filters.yearEnabled) {
+    filterSummaryParts.push(
+      `Year: ${filters.yearMin} – ${filters.yearMax}`,
+    );
+  }
+  if (filters.citationsEnabled) {
+    filterSummaryParts.push(`Citations: ≥ ${filters.minCitations}`);
+  }
+  if (filters.similarityEnabled) {
+    filterSummaryParts.push(
+      `Relevance: ≥ ${Math.round(filters.minRelevance * 100)}%`,
+    );
+  }
+  const filterSummary =
+    "Filters Applied: " +
+    (filterSummaryParts.length > 0
+      ? filterSummaryParts.join(" | ")
+      : "No filters applied");
+
   return (
     <>
       <style>{floatStyle}</style>
 
       <div className="h-screen flex flex-col bg-page-bg text-white">
-        <AppHeader showBack onBack={() => navigate(-1)} />
+        <AppHeader
+          showBack
+          onBack={() => navigate(-1)}
+          showSearch
+          searchValue={filters.searchQuery}
+          onSearchChange={(v) =>
+            setFilters((f) => ({ ...f, searchQuery: v }))
+          }
+          onSearchSubmit={() => {}}
+          searchPlaceholder="Search in graph…"
+        />
+
+        <div className="border-b border-border-default px-6 py-2 text-sm text-text-muted text-center">
+          {filterSummary}
+        </div>
 
         <div className="m-6 flex min-h-0 flex-1 gap-4">
           {/* Filter sidebar (collapsible) */}
@@ -330,7 +367,11 @@ export function FlowPage() {
           >
             {sidebarOpen ? (
               <div className="w-[280px] h-full min-h-0">
-                <FilterSidebar filters={filters} onFiltersChange={setFilters} />
+                <FilterSidebar
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  onReset={() => setFilters(DEFAULT_FLOW_FILTERS)}
+                />
               </div>
             ) : null}
           </div>
