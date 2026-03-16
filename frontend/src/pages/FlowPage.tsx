@@ -382,30 +382,6 @@ export function FlowPage() {
     };
   }, [paperId, depth, filters.yearMin, filters.yearMax, filters.yearEnabled, filters.minCitations, filters.citationsEnabled, filters.minRelevance, filters.similarityEnabled, rf]);
 
-  const filterSummaryParts: string[] = [];
-  if (filters.searchQuery.trim()) {
-    filterSummaryParts.push(`Search: "${filters.searchQuery.trim()}"`);
-  }
-  // Order matches sidebar: Relevance, Year, Citation
-  if (filters.similarityEnabled) {
-    filterSummaryParts.push(
-      `Relevance: ≥ ${Math.round(filters.minRelevance * 100)}%`,
-    );
-  }
-  if (filters.yearEnabled) {
-    filterSummaryParts.push(
-      `Year: ${filters.yearMin} – ${filters.yearMax}`,
-    );
-  }
-  if (filters.citationsEnabled) {
-    filterSummaryParts.push(`Citations: ≥ ${filters.minCitations}`);
-  }
-  const filterSummary =
-    "Filters Applied: " +
-    (filterSummaryParts.length > 0
-      ? filterSummaryParts.join(" | ")
-      : "No filters applied");
-
   return (
     <>
       <style>{floatStyle}</style>
@@ -423,18 +399,14 @@ export function FlowPage() {
           searchPlaceholder="Search in graph…"
         />
 
-        <div className="border-b border-border-default px-6 py-2 text-sm text-text-muted text-center">
-          {filterSummary}
-        </div>
-
-        <div className="m-6 flex min-h-0 flex-1 gap-4">
+        <div className="m-4 flex min-h-0 flex-1 gap-3">
           {/* Filter sidebar (collapsible) */}
           <div
             className="flex shrink-0 flex-col transition-[width] duration-200 ease-out overflow-hidden"
-            style={{ width: sidebarOpen ? 280 : 0 }}
+            style={{ width: sidebarOpen ? 240 : 0 }}
           >
             {sidebarOpen ? (
-              <div className="w-[280px] h-full min-h-0">
+              <div className="w-[240px] h-full min-h-0">
                 <FilterSidebar
                   filters={filters}
                   onFiltersChange={setFilters}
@@ -452,7 +424,7 @@ export function FlowPage() {
             aria-expanded={sidebarOpen}
             title={sidebarOpen ? "Close filters" : "Open filters"}
             className="
-              shrink-0 self-center w-9 h-9 rounded-xl
+              shrink-0 self-center w-8 h-8 rounded-lg
               flex items-center justify-center
               bg-panel-bg border border-border-default
               text-text-muted hover:text-text hover:border-border-accent
