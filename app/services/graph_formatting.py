@@ -18,7 +18,9 @@ class ReactFlowFormatter:
         relevance_edges: List[RelevanceEdge],
         citation_edges: List[CitationEdge],
         root_id: str,
+        ghost_ids: Optional[set[str]] = None,
     ) -> Dict[str, Any]:
+        ghost_ids = ghost_ids or set()
         paper_scores = {
             (e.dest_id if e.src_id == root_id else e.src_id): e.relevance_score
             for e in relevance_edges
@@ -26,7 +28,10 @@ class ReactFlowFormatter:
 
         nodes = [
             ReactFlowFormatter._build_node(
-                p, paper_scores.get(p.id, RelevanceScore(0, 0, 0)), p.id == root_id
+                p,
+                paper_scores.get(p.id, RelevanceScore(0, 0, 0)),
+                p.id == root_id,
+                is_ghost=(p.id in ghost_ids),
             )
             for p in papers.values()
         ]
@@ -41,7 +46,10 @@ class ReactFlowFormatter:
 
     @staticmethod
     def _build_node(
-        paper: ResearchPaper, relevance_score: RelevanceScore, is_root: bool
+        paper: ResearchPaper,
+        relevance_score: RelevanceScore,
+        is_root: bool,
+        is_ghost: bool = False,
     ) -> Dict[str, Any]:
         props = paper.to_props()
         props["authors"] = [
@@ -57,6 +65,7 @@ class ReactFlowFormatter:
                 "relevance_score": relevance_score.combined,
                 "llm_explanation": relevance_score.llm_explanation,
                 "is_root": is_root,
+                "is_ghost": is_ghost,
             },
             "position": {"x": 0, "y": 0},
         }

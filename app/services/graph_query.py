@@ -25,17 +25,22 @@ class GraphQueryService:
 
     def get_filtered_graph(
         self, paper_id: str, filters: GraphFilters
-    ) -> Tuple[dict[str, ResearchPaper], List[RelevanceEdge], List[CitationEdge]]:
+    ) -> Tuple[
+        dict[str, ResearchPaper],
+        dict[str, ResearchPaper],
+        List[RelevanceEdge],
+        List[CitationEdge],
+    ]:
         papers_by_id, relevance_edges, citation_edges = self.reader.read(
             paper_id, filters.max_depth
         )
         root_paper = papers_by_id.pop(paper_id, None)
 
         if root_paper is None:
-            return {}, [], []
+            return {}, {}, [], []
 
         if not papers_by_id:
-            return {paper_id: root_paper}, [], []
+            return {paper_id: root_paper}, {}, [], []
 
         top_papers = self._top_k(
             paper_id,
@@ -60,10 +65,49 @@ class GraphQueryService:
         filtered_papers[root_paper.id] = root_paper
         filtered_ids = set(filtered_papers.keys())
 
-        filtered_relevance = self._filter_by_paper_ids(relevance_edges, filtered_ids)
-        filtered_citations = self._filter_by_paper_ids(citation_edges, filtered_ids)
+        # Filtered papers only visible when on a path from an unfiltered paper *toward the root*.
+        # 1) Distance from root (BFS both directions). 2) From each unfiltered node, traverse only to neighbors closer to root.
+        valid_ids = filtered_ids | set(papers_by_id.keys())
+        adj = defaultdict(set)
+        for e in citation_edges:
+            if e.src_id in valid_ids and e.dest_id in valid_ids:
+                adj[e.src_id].add(e.dest_id)
+                adj[e.dest_id].add(e.src_id)
+        dist_from_root = {}
+        frontier = {paper_id}
+        d = 0
+        while frontier:
+            for n in frontier:
+                dist_from_root[n] = d
+            next_frontier = set()
+            for n in frontier:
+                for neighbor in adj.get(n, []):
+                    if neighbor not in dist_from_root:
+                        next_frontier.add(neighbor)
+            frontier = next_frontier
+            d += 1
+        display_ids = set(filtered_ids)
+        frontier = set(filtered_ids)
+        while frontier:
+            next_frontier = set()
+            for n in frontier:
+                my_d = dist_from_root.get(n, float("inf"))
+                for neighbor in adj.get(n, []):
+                    if neighbor in display_ids:
+                        continue
+                    neighbor_d = dist_from_root.get(neighbor, float("inf"))
+                    if neighbor_d < my_d:  # only step toward root
+                        display_ids.add(neighbor)
+                        next_frontier.add(neighbor)
+            frontier = next_frontier
+        ghost_ids = display_ids - filtered_ids
+        ghost_papers = {pid: papers_by_id[pid] for pid in ghost_ids if pid in papers_by_id}
 
-        return filtered_papers, filtered_relevance, filtered_citations
+        display_ids = filtered_ids | ghost_ids
+        filtered_relevance = self._filter_by_paper_ids(relevance_edges, filtered_ids)
+        display_citations = self._filter_by_paper_ids(citation_edges, display_ids)
+
+        return filtered_papers, ghost_papers, filtered_relevance, display_citations
 
     def _passes_filters(self, p: ResearchPaper, filters: GraphFilters) -> bool:
         return (

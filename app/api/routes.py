@@ -92,14 +92,17 @@ def get_graph(paper_id: str):
     )
 
     graph_service = get_graph_service()
-    papers, relevance_edges, citation_edges = graph_service.get_filtered_graph(
-        paper_id, filters
+    filtered_papers, ghost_papers, relevance_edges, citation_edges = (
+        graph_service.get_filtered_graph(paper_id, filters)
     )
 
-    if not papers or paper_id not in papers:
+    if not filtered_papers or paper_id not in filtered_papers:
         return jsonify({"error": "Paper not found"}), 404
 
-    connected_pids = [pid for pid in papers.keys() if pid != paper_id]
+    papers = {**filtered_papers, **ghost_papers}
+    ghost_ids = set(ghost_papers.keys())
+    # Only score relevance / LLM for visible (filtered) papers, not ghosts
+    connected_pids = [pid for pid in filtered_papers.keys() if pid != paper_id]
     relevance_pairs = {(r.src_id, r.dest_id): r for r in relevance_edges}
 
     # Generate missing relevance scores from embeddings
@@ -154,7 +157,11 @@ def get_graph(paper_id: str):
         task_data["task_id"] = task.id
 
     graph_data = ReactFlowFormatter.format_graph(
-        papers, relevance_edges, citation_edges, root_id=paper_id
+        papers,
+        relevance_edges,
+        citation_edges,
+        root_id=paper_id,
+        ghost_ids=ghost_ids,
     )
 
     return jsonify(

@@ -53,6 +53,7 @@ export type PaperNodeData = Record<string, unknown> & {
   llm_explanation: string | null;
   isPending: boolean;
   isUpdated: boolean;
+  isGhost?: boolean;
 };
 
 export type PaperFlowNode = Node<PaperNodeData, "paperNode">;

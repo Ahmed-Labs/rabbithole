@@ -3,14 +3,22 @@ import { Handle, Position } from "@xyflow/react";
 import type { PaperNodeData } from "../types/graph";
 import { relevanceColor } from "../utils/relevanceColor";
 
+const GHOST_COLOR = "#71717a";
+
 export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
-  const color = data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
+  const isGhost = data.isGhost === true;
+  const color = isGhost
+    ? GHOST_COLOR
+    : data.isRoot
+      ? "#818cf8"
+      : relevanceColor(data.relevance_score);
   const floatDelay = `${(data.title.length % 20) * 0.1}s`;
 
   const classNames = [
     "rounded-lg bg-[var(--color-card-bg)] text-white text-xs w-52 cursor-pointer paper-node-float",
     data.isPending ? "paper-node-pending" : "",
     data.isUpdated ? "paper-node-updated" : "",
+    isGhost ? "opacity-60" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -28,6 +36,9 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
       <div className="h-1 rounded-t-md" style={{ background: color }} />
 
       <div className="p-3 flex flex-col gap-1">
+        {isGhost && (
+          <span className="text-[9px] font-medium text-zinc-400 mb-0.5">Filtered</span>
+        )}
         <p className="font-semibold leading-snug line-clamp-3 text-[11px]">
           {data.title}
         </p>
@@ -39,7 +50,12 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
                 AI
               </span>
             )}
-            {!data.isRoot && (
+            {isGhost && (
+              <span className="text-[10px] font-medium text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-700/50">
+                Filtered
+              </span>
+            )}
+            {!data.isRoot && !isGhost && (
               <span
                 className="text-[10px] font-medium px-1.5 py-0.5 rounded"
                 style={{ background: color + "22", color }}
@@ -47,7 +63,7 @@ export const PaperNode = memo(({ data }: { data: PaperNodeData }) => {
                 {(data.relevance_score * 100).toFixed(0)}%
               </span>
             )}
-            {data.isRoot && (
+            {data.isRoot && !isGhost && (
               <span className="text-[10px] font-semibold text-indigo-300 px-1.5 py-0.5 rounded bg-indigo-900/40">
                 Root
               </span>

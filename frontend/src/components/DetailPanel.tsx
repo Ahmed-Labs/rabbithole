@@ -4,12 +4,23 @@ import { relevanceColor } from "../utils/relevanceColor";
 interface DetailPanelProps {
   data: PaperNodeData;
   onClose: () => void;
+  /** When true, show a note that the paper does not match the current search filter. */
+  isFilteredOut?: boolean;
 }
 
-export function DetailPanel({ data, onClose }: DetailPanelProps) {
+export function DetailPanel({
+  data,
+  onClose,
+  isFilteredOut = false,
+}: DetailPanelProps) {
   const color = data.isRoot ? "#818cf8" : relevanceColor(data.relevance_score);
   return (
     <div className="absolute top-0 right-0 h-full w-80 bg-panel-bg border-l border-zinc-700 flex flex-col z-10 overflow-hidden">
+      {isFilteredOut && (
+        <div className="px-4 py-2 bg-amber-900/30 border-b border-amber-700/50 text-amber-200 text-xs">
+          This paper does not match the current search filter.
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
         <span className="text-sm font-semibold text-white">Paper details</span>
         <button
@@ -32,12 +43,17 @@ export function DetailPanel({ data, onClose }: DetailPanelProps) {
             <span className="text-[11px] text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
               {data.citation_count} citations
             </span>
-            {!data.isRoot && (
+            {!data.isRoot && !isFilteredOut && (
               <span
                 className="text-[11px] font-semibold px-2 py-0.5 rounded"
                 style={{ background: color + "22", color }}
               >
                 {(data.relevance_score * 100).toFixed(0)}% relevant
+              </span>
+            )}
+            {isFilteredOut && (
+              <span className="text-[11px] font-medium text-zinc-400 px-2 py-0.5 rounded bg-zinc-700/50">
+                Filtered out
               </span>
             )}
           </div>
