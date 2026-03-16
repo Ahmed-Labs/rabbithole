@@ -13,35 +13,7 @@ export interface FlowFilters {
 /** Semantic Scholar corpus includes papers from the 20th century onward; 1900 is a safe lower bound. */
 const YEAR_MIN = 1900;
 const CITATIONS_MAX = 225000;
-const CITATIONS_LOW_RANGE = 1000; // most of the slider covers 0–1000
-const SLIDER_BREAK = 0.9; // last 10% of slider covers 1000–225000
 const RELEVANCE_STEP = 0.01;
-
-/** Map citation count to slider position (0–1). Most of slider is 0–1000; right edge is 1000–225000. */
-function citationToSlider(value: number): number {
-  if (value <= 0) return 0;
-  if (value <= CITATIONS_LOW_RANGE) {
-    return (value / CITATIONS_LOW_RANGE) * SLIDER_BREAK;
-  }
-  return (
-    SLIDER_BREAK +
-    ((value - CITATIONS_LOW_RANGE) / (CITATIONS_MAX - CITATIONS_LOW_RANGE)) *
-      (1 - SLIDER_BREAK)
-  );
-}
-
-/** Map slider position (0–1) to citation count. */
-function sliderToCitation(slider: number): number {
-  if (slider <= 0) return 0;
-  if (slider <= SLIDER_BREAK) {
-    return Math.round((slider / SLIDER_BREAK) * CITATIONS_LOW_RANGE);
-  }
-  return Math.round(
-    CITATIONS_LOW_RANGE +
-      ((slider - SLIDER_BREAK) / (1 - SLIDER_BREAK)) *
-        (CITATIONS_MAX - CITATIONS_LOW_RANGE),
-  );
-}
 
 interface FilterSidebarProps {
   filters: FlowFilters;
@@ -198,9 +170,7 @@ export function FilterSidebar({
           <div
             className={`flex flex-col gap-2.5 transition-opacity ${!filters.yearEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
-          <p className="text-xs text-text-muted">
-            Type a value or use the sliders below.
-          </p>
+          <p className="text-xs text-text-muted">Type a value for each bound.</p>
           <div className="flex items-center gap-2">
             <div
               className="
@@ -264,40 +234,8 @@ export function FilterSidebar({
               />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <input
-              type="range"
-              min={YEAR_MIN}
-              max={yearMax}
-              value={filters.yearMin}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                update({
-                  yearMin: v,
-                  yearMax: Math.max(v, filters.yearMax),
-                });
-              }}
-              aria-label="Minimum year slider"
-              className="range-input w-full"
-            />
-            <input
-              type="range"
-              min={YEAR_MIN}
-              max={yearMax}
-              value={filters.yearMax}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                update({
-                  yearMax: v,
-                  yearMin: Math.min(v, filters.yearMin),
-                });
-              }}
-              aria-label="Maximum year slider"
-              className="range-input w-full"
-            />
-          </div>
           <div className="text-xs text-text-muted tabular-nums">
-            {filters.yearMin} — {filters.yearMax} (slider)
+            {filters.yearMin} — {filters.yearMax}
           </div>
           </div>
         </div>
@@ -337,15 +275,8 @@ export function FilterSidebar({
           <div
             className={`flex flex-col gap-2.5 transition-opacity ${!filters.citationsEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
-          <p className="text-xs text-text-muted">
-            Type a value or use the slider below.
-          </p>
-          <div
-            className="
-              rounded-2xl border border-border-default bg-input-bg
-              px-3 py-2 focus-within:ring-1 focus-within:ring-focus/30
-            "
-          >
+          <p className="text-xs text-text-muted">Type a minimum citation count.</p>
+          <div className="rounded-2xl border border-border-default bg-input-bg px-3 py-2 focus-within:ring-1 focus-within:ring-focus/30">
             <input
               id="flow-filter-citations-input"
               type="number"
@@ -359,27 +290,12 @@ export function FilterSidebar({
                     minCitations: Math.max(0, Math.min(CITATIONS_MAX, v)),
                   });
               }}
-              aria-label="Minimum citations (type or use slider)"
+                aria-label="Minimum citations"
               className="w-full bg-transparent text-text tabular-nums outline-none"
             />
           </div>
-          <input
-            id="flow-filter-citations"
-            type="range"
-            min={0}
-            max={1}
-            step={0.001}
-            value={citationToSlider(filters.minCitations)}
-            onChange={(e) =>
-              update({
-                minCitations: sliderToCitation(Number(e.target.value)),
-              })
-            }
-            aria-label="Minimum citations slider (log scale)"
-            className="range-input w-full"
-          />
           <div className="text-xs text-text-muted tabular-nums">
-            ≥ {filters.minCitations} (slider)
+            ≥ {filters.minCitations} citations
           </div>
           </div>
         </div>
