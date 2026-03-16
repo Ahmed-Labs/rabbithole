@@ -416,6 +416,7 @@ export function FlowPage() {
             ) : null}
           </div>
 
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
           {/* Toggle filter sidebar */}
           <button
             type="button"
@@ -424,11 +425,12 @@ export function FlowPage() {
             aria-expanded={sidebarOpen}
             title={sidebarOpen ? "Close filters" : "Open filters"}
             className="
-              shrink-0 self-center w-8 h-8 rounded-lg
+              absolute left-3 top-1/2 -translate-y-1/2 z-20
+              w-8 h-8 rounded-lg cursor-pointer
               flex items-center justify-center
-              bg-panel-bg border border-border-default
-              text-text-muted hover:text-text hover:border-border-accent
-              transition focus-visible:ring-2 focus-visible:ring-focus/40
+              bg-input-bg-dark/80
+              text-text-muted hover:text-text
+              transition focus-visible:ring-2 focus-visible:ring-focus/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent
             "
           >
             {sidebarOpen ? (
@@ -464,7 +466,6 @@ export function FlowPage() {
             )}
           </button>
 
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-input-bg-dark">
           <ReactFlow<PaperFlowNode, Edge>
             nodes={displayNodes}
             edges={displayEdges}
