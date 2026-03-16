@@ -65,24 +65,43 @@ class GraphQueryService:
         filtered_papers[root_paper.id] = root_paper
         filtered_ids = set(filtered_papers.keys())
 
-        # Ghost papers: show if (1) has an unfiltered child that is not the root (ghost -> visible, visible != root), or (2) has an unfiltered parent that is not the root (visible -> ghost, visible != root).
-        ghost_ids = set()
+        # Filtered papers only visible when on a path from an unfiltered paper *toward the root*.
+        # 1) Distance from root (BFS both directions). 2) From each unfiltered node, traverse only to neighbors closer to root.
+        valid_ids = filtered_ids | set(papers_by_id.keys())
+        adj = defaultdict(set)
         for e in citation_edges:
-            if (
-                e.dest_id in filtered_ids
-                and e.dest_id != paper_id  # child is not the root
-                and e.src_id not in filtered_ids
-                and e.src_id in papers_by_id
-            ):
-                ghost_ids.add(e.src_id)  # ghost has visible non-root child
-            if (
-                e.src_id in filtered_ids
-                and e.src_id != paper_id  # parent is not the root
-                and e.dest_id not in filtered_ids
-                and e.dest_id in papers_by_id
-            ):
-                ghost_ids.add(e.dest_id)  # ghost has visible non-root parent
-        ghost_papers = {pid: papers_by_id[pid] for pid in ghost_ids}
+            if e.src_id in valid_ids and e.dest_id in valid_ids:
+                adj[e.src_id].add(e.dest_id)
+                adj[e.dest_id].add(e.src_id)
+        dist_from_root = {}
+        frontier = {paper_id}
+        d = 0
+        while frontier:
+            for n in frontier:
+                dist_from_root[n] = d
+            next_frontier = set()
+            for n in frontier:
+                for neighbor in adj.get(n, []):
+                    if neighbor not in dist_from_root:
+                        next_frontier.add(neighbor)
+            frontier = next_frontier
+            d += 1
+        display_ids = set(filtered_ids)
+        frontier = set(filtered_ids)
+        while frontier:
+            next_frontier = set()
+            for n in frontier:
+                my_d = dist_from_root.get(n, float("inf"))
+                for neighbor in adj.get(n, []):
+                    if neighbor in display_ids:
+                        continue
+                    neighbor_d = dist_from_root.get(neighbor, float("inf"))
+                    if neighbor_d < my_d:  # only step toward root
+                        display_ids.add(neighbor)
+                        next_frontier.add(neighbor)
+            frontier = next_frontier
+        ghost_ids = display_ids - filtered_ids
+        ghost_papers = {pid: papers_by_id[pid] for pid in ghost_ids if pid in papers_by_id}
 
         display_ids = filtered_ids | ghost_ids
         filtered_relevance = self._filter_by_paper_ids(relevance_edges, filtered_ids)

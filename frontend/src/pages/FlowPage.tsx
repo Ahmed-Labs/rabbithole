@@ -103,25 +103,53 @@ function filterVisibleBySearch(
       })
       .map((n) => n.id),
   );
-  // Ghost: show if (1) has unfiltered child that is not the root, or (2) has unfiltered parent that is not the root.
+  // Filtered papers only visible when on a path from an unfiltered paper *toward the root*.
   const rootId = nodes.find((n) => n.data?.isRoot === true)?.id ?? null;
-  const ghostIds = new Set<string>();
+  const adj = new Map<string, Set<string>>();
   for (const e of edges) {
     if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) continue;
-    if (
-      visibleIds.has(e.target) &&
-      e.target !== rootId &&
-      !visibleIds.has(e.source)
-    )
-      ghostIds.add(e.source);
-    if (
-      visibleIds.has(e.source) &&
-      e.source !== rootId &&
-      !visibleIds.has(e.target)
-    )
-      ghostIds.add(e.target);
+    if (!adj.has(e.source)) adj.set(e.source, new Set());
+    adj.get(e.source)!.add(e.target);
+    if (!adj.has(e.target)) adj.set(e.target, new Set());
+    adj.get(e.target)!.add(e.source);
   }
-  const displayIds = new Set([...visibleIds, ...ghostIds]);
+  const distFromRoot = new Map<string, number>();
+  if (rootId != null) {
+    let frontier = new Set<string>([rootId]);
+    let d = 0;
+    while (frontier.size > 0) {
+      for (const id of frontier) distFromRoot.set(id, d);
+      const next = new Set<string>();
+      for (const id of frontier) {
+        for (const neighbor of adj.get(id) ?? []) {
+          if (!distFromRoot.has(neighbor)) next.add(neighbor);
+        }
+      }
+      frontier = next;
+      d++;
+    }
+  }
+  const displayIds = new Set(visibleIds);
+  let frontier = new Set(visibleIds);
+  while (frontier.size > 0) {
+    const next = new Set<string>();
+    for (const id of frontier) {
+      const myD = distFromRoot.get(id) ?? Infinity;
+      for (const neighbor of adj.get(id) ?? []) {
+        if (displayIds.has(neighbor)) continue;
+        const neighborD = distFromRoot.get(neighbor) ?? Infinity;
+        if (neighborD < myD) {
+          displayIds.add(neighbor);
+          next.add(neighbor);
+        }
+      }
+    }
+    frontier = next;
+  }
+  const ghostIds = new Set<string>();
+  for (const id of displayIds) {
+    if (!visibleIds.has(id)) ghostIds.add(id);
+  }
   const displayNodes = nodes
     .filter((n) => displayIds.has(n.id))
     .map((n) => {
