@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -126,21 +127,34 @@ class LLMScorer:
         batch_size: int = LLM_BATCH_SIZE,
     ) -> List[RelevanceEdge]:
         edges: List[RelevanceEdge] = []
+        if not target_papers:
+            return edges
 
-        for i in range(0, len(target_papers), batch_size):
-            chunk = list(target_papers[i : i + batch_size])
+        max_workers = max(1, LLM_MAX_CONCURRENT_BATCHES)
+
+        chunks: List[List[Tuple[ResearchPaper, RelevanceEdge]]] = [
+            list(target_papers[i : i + batch_size])
+            for i in range(0, len(target_papers), batch_size)
+        ]
+
+        def score_chunk(chunk: List[Tuple[ResearchPaper, RelevanceEdge]]) -> List[RelevanceEdge]:
             prompt = self._create_batch_prompt(root_paper, [p for p, _ in chunk])
+            data = self._call_llm_json(prompt)
+            parsed = self._parse_batch(data, n=len(chunk))
 
-            try:
-                data = self._call_llm_json(prompt)
-                parsed = self._parse_batch(data, n=len(chunk))
+            out: List[RelevanceEdge] = []
+            for (_, edge), result in zip(chunk, parsed):
+                edge.relevance_score.llm_score = result.relevance_score
+                edge.relevance_score.llm_explanation = result.explanation
+                out.append(edge)
+            return out
 
-                for (_, edge), result in zip(chunk, parsed):
-                    edge.relevance_score.llm_score = result.relevance_score
-                    edge.relevance_score.llm_explanation = result.explanation
-                    edges.append(edge)
-
-            except Exception as e:
-                print(f"LLM scoring failed: {e}")
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(score_chunk, chunk) for chunk in chunks]
+            for fut in as_completed(futures):
+                try:
+                    edges.extend(fut.result())
+                except Exception as e:
+                    print(f"LLM scoring failed: {e}")
 
         return edges

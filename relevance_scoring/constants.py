@@ -16,6 +16,9 @@ LLM_SCORING_THRESHOLD = 0.8
 # Number of papers to batch into one LLM API call
 LLM_BATCH_SIZE = 50
 
+# Number of LLM batches to run concurrently
+LLM_MAX_CONCURRENT_BATCHES = 4
+
 # Tag or suffix of the embedding key to denote its type
 # text -> Pooled paper text
 # meta -> Title + abstract of paper
