@@ -29,6 +29,7 @@ import {
   FilterSidebar,
   type FlowFilters,
 } from "../components/FilterSidebar";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 const NODE_W = 210;
 const NODE_H = 100;
@@ -36,6 +37,7 @@ const INITIAL_ZOOM = 0.8;
 const DEFAULT_DEPTH = 3;
 const POLL_INTERVAL_MS = 2500;
 const UPDATED_FLASH_MS = 2000;
+const RELEVANCE_SLIDER_DEBOUNCE_MS = 350;
 
 const DEFAULT_FLOW_FILTERS: FlowFilters = {
   searchQuery: "",
@@ -174,13 +176,15 @@ export function FlowPage() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FLOW_FILTERS);
+  const debouncedMinRelevance = useDebouncedValue(
+    filters.minRelevance,
+    RELEVANCE_SLIDER_DEBOUNCE_MS,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
-  const [rf, setRf] = useState<ReactFlowInstance<PaperFlowNode, Edge> | null>(
-    null,
-  );
+  const rfRef = useRef<ReactFlowInstance<PaperFlowNode, Edge> | null>(null);
 
   const { displayNodes, displayEdges } = useMemo(
     () =>
@@ -264,6 +268,7 @@ export function FlowPage() {
   // Refetch after task completes, diff against current nodes to flash updated ones
   async function refetchAfterTask(signal: AbortSignal) {
     const qs = buildGraphQueryString(depth, filtersRef.current);
+    qs.set("queue_llm", "0");
     const res = await fetch(`/api/graph/${encodeURIComponent(paperId)}?${qs}`, {
       headers: { Accept: "application/json" },
       signal,
@@ -328,7 +333,10 @@ export function FlowPage() {
 
     async function load() {
       try {
-        const qs = buildGraphQueryString(depth, filters);
+        const qs = buildGraphQueryString(depth, {
+          ...filters,
+          minRelevance: debouncedMinRelevance,
+        });
         const res = await fetch(
           `/api/graph/${encodeURIComponent(paperId)}?${qs}`,
           {
@@ -358,7 +366,7 @@ export function FlowPage() {
         setSelectedPaperId(null);
         setPendingCount(pendingN);
 
-        if (rf) centerOnRoot(flowNodes, rf);
+        if (rfRef.current) centerOnRoot(flowNodes, rfRef.current);
 
         if (task_id && pendingN > 0) {
           taskIdRef.current = task_id;
@@ -380,7 +388,17 @@ export function FlowPage() {
       controller.abort();
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
-  }, [paperId, depth, filters.yearMin, filters.yearMax, filters.yearEnabled, filters.minCitations, filters.citationsEnabled, filters.minRelevance, filters.similarityEnabled, rf]);
+  }, [
+    paperId,
+    depth,
+    filters.yearMin,
+    filters.yearMax,
+    filters.yearEnabled,
+    filters.minCitations,
+    filters.citationsEnabled,
+    filters.similarityEnabled,
+    debouncedMinRelevance,
+  ]);
 
   return (
     <>
@@ -472,7 +490,9 @@ export function FlowPage() {
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeClick={onNodeClick}
-            onInit={setRf}
+            onInit={(instance) => {
+              rfRef.current = instance;
+            }}
             autoPanOnNodeFocus={false}
           >
             <Background color="var(--color-border-default)" gap={20} />
