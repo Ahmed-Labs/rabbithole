@@ -25,14 +25,14 @@ def generate_embeddings_task(
         include_citations=True,
     )
 
-    embedder = Embedder()
-    embedder.embed_citation_graph(root_paper)
-
     cfg = Neo4jConfig.from_env()
     with Neo4jClient(cfg) as client:
         writer = KnowledgeGraphWriter(client)
         writer.ensure_schema()
         writer.persist_knowledge_graph(root_paper)
+
+    embedder = Embedder()
+    embedder.embed_citation_graph(root_paper)
 
     return {
         "status": "success",

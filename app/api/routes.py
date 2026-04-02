@@ -90,6 +90,7 @@ def get_graph(paper_id: str):
         min_citations=request.args.get("min_citations", type=int),
         min_relevance=request.args.get("min_relevance", type=float),
     )
+    queue_llm = request.args.get("queue_llm", default=1, type=int) != 0
 
     graph_service = get_graph_service()
     filtered_papers, ghost_papers, relevance_edges, citation_edges = (
@@ -109,9 +110,6 @@ def get_graph(paper_id: str):
     relevance_scorer = get_relevance_scorer()
     new_relevance_edges: list[RelevanceEdge] = []
 
-    # Each paper to score with LLM along with edge connecting it to the paper
-    llm_targets: List[Tuple[ResearchPaper, RelevanceEdge]] = []
-
     p1 = papers.get(paper_id)
 
     for pid in connected_pids:
@@ -120,19 +118,9 @@ def get_graph(paper_id: str):
             continue
 
         if (paper_id, pid) in relevance_pairs or (pid, paper_id) in relevance_pairs:
-            edge = relevance_pairs.get(
-                (paper_id, pid), relevance_pairs.get((pid, paper_id))
-            )
-
-            if edge.relevance_score.llm_score is None:
-                llm_targets.append((p2, edge))
-
             continue
 
         score = relevance_scorer.compute_relevance_score(p1, p2)
-        if score.semantic_similarity == 0.0:
-            continue
-
         edge = RelevanceEdge(
             src_id=paper_id,
             dest_id=pid,
@@ -140,17 +128,38 @@ def get_graph(paper_id: str):
         )
 
         new_relevance_edges.append(edge)
-        llm_targets.append((p2, edge))
 
     # Store new relevance edges and add them to response
     if len(new_relevance_edges) > 0:
         db = get_graph_writer()
         db.upsert_relevance_edges(new_relevance_edges)
-        relevance_edges.extend(new_relevance_edges)
+
+        # Re-fetch so TOP_K and filters are applied using the freshly
+        # persisted non-LLM relevance scores.
+        filtered_papers, ghost_papers, relevance_edges, citation_edges = (
+            graph_service.get_filtered_graph(paper_id, filters)
+        )
+        papers = {**filtered_papers, **ghost_papers}
+        ghost_ids = set(ghost_papers.keys())
+        p1 = papers.get(paper_id)
+        connected_pids = [pid for pid in filtered_papers.keys() if pid != paper_id]
+        relevance_pairs = {(r.src_id, r.dest_id): r for r in relevance_edges}
+
+    llm_targets: List[Tuple[ResearchPaper, RelevanceEdge]] = []
+    for pid in connected_pids:
+        p2 = papers.get(pid)
+        if p2 is None:
+            continue
+
+        edge = relevance_pairs.get((paper_id, pid), relevance_pairs.get((pid, paper_id)))
+        if edge is None:
+            continue
+        if edge.relevance_score.llm_score is None:
+            llm_targets.append((p2, edge))
 
     # Queue LLM task
     task_data = {}
-    if len(llm_targets) > 0:
+    if queue_llm and len(llm_targets) > 0:
         targets = [(p.to_props(), e.to_props()) for p, e in llm_targets]
         task = generate_llm_score.delay(p1.to_props(), targets)
 

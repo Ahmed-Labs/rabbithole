@@ -42,13 +42,27 @@ class GraphQueryService:
         if not papers_by_id:
             return {paper_id: root_paper}, {}, [], []
 
-        top_papers = self._top_k(
-            paper_id,
-            citation_edges,
-            relevance_edges,
-            filters.max_depth,
-            TOP_K_PAPERS,
-        )
+        # If relevance edges are missing (e.g., first-time run / embeddings not computed yet),
+        # picking top-k based on persisted relevance becomes arbitrary and can exclude
+        # potentially relevant nodes before we score them.
+        covered_ids = set()
+        for e in relevance_edges:
+            other = e.dest_id if e.src_id == paper_id else e.src_id
+            if other in papers_by_id:
+                covered_ids.add(other)
+        missing_relevance = len(covered_ids) < len(papers_by_id)
+
+        if missing_relevance:
+            # Keep the full candidate neighborhood for the caller to score.
+            top_papers = set(papers_by_id.keys())
+        else:
+            top_papers = self._top_k(
+                paper_id,
+                citation_edges,
+                relevance_edges,
+                filters.max_depth,
+                TOP_K_PAPERS,
+            )
 
         filtered_papers = {
             pid: p
@@ -56,7 +70,7 @@ class GraphQueryService:
             if self._passes_filters(p, filters) and pid in top_papers
         }
 
-        if filters.min_relevance is not None:
+        if filters.min_relevance is not None and not missing_relevance:
             for e in relevance_edges:
                 pid = e.dest_id if e.src_id == paper_id else e.src_id
                 if e.relevance_score.combined < filters.min_relevance:
@@ -141,7 +155,8 @@ class GraphQueryService:
         relevance = {}
         for e in relevance_edges:
             other = e.dest_id if e.src_id == root_id else e.src_id
-            relevance[other] = e.relevance_score.combined
+            # Keep top-k stable across async LLM updates by ranking on base score only.
+            relevance[other] = e.relevance_score.non_llm_combined
 
         def bfs(seeds, adj):
             kept = set()
