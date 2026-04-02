@@ -20,21 +20,27 @@ class RelevanceScore:
     llm_explanation: Optional[str] = None
 
     @property
-    def combined(self):
-        existing_score = (
+    def non_llm_combined(self) -> float:
+        """Base relevance used for stable ranking/filtering before/after async LLM updates."""
+        return (
             SEMANTIC_SIMILARITY_WEIGHT * self.semantic_similarity
             + YEAR_SIMILARITY_WEIGHT * self.year_similarity
             + CITATION_SCORE_WEIGHT * self.citation_score
         )
 
+    @property
+    def combined(self):
+        existing_score = self.non_llm_combined
+
         if self.llm_score is not None:
-            if existing_score == 0.0:
+            # No embedding similarity (or nothing to blend): LLM score from abstracts/titles is the relevance.
+            if self.semantic_similarity == 0.0 or existing_score == 0.0:
                 return self.llm_score
             return (
                 1 - LLM_SCORE_WEIGHT
             ) * existing_score + LLM_SCORE_WEIGHT * self.llm_score
 
-        return existing_score
+        return existing_score if self.semantic_similarity != 0.0 else 0
 
     def to_props(self):
         props = {
